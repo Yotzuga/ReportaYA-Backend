@@ -1,0 +1,124 @@
+@startuml ReportaYA - Diagrama de Base de Datos
+
+skinparam linetype ortho
+skinparam classAttributeIconSize 0
+hide circle
+
+entity "personas" {
+  * id : BIGSERIAL <<PK>>
+  --
+  * nombres : VARCHAR(255)
+  * apellidos : VARCHAR(255)
+  * dni : VARCHAR(50) <<UNIQUE>>
+  * telefono : VARCHAR(50)
+  * correo : VARCHAR(255) <<UNIQUE>>
+}
+
+entity "cuentas" {
+  * id : BIGSERIAL <<PK>>
+  --
+  * usuario : VARCHAR(255) <<UNIQUE>>
+  * contrasena_hash : VARCHAR(255)
+  * persona_id : BIGINT <<FK, UNIQUE>>
+  fecha_creacion : TIMESTAMP
+  fecha_actualizacion : TIMESTAMP
+  * activo : BOOLEAN
+}
+
+entity "operadores_municipales" {
+  * id : BIGINT <<PK, FK>>
+}
+
+entity "tecnicos" {
+  * id : BIGINT <<PK, FK>>
+}
+
+entity "ciudadanos" {
+  * id : BIGINT <<PK, FK>>
+}
+
+entity "ubicaciones" {
+  * id : BIGSERIAL <<PK>>
+  --
+  * direccion : VARCHAR(500)
+  latitud : DOUBLE
+  longitud : DOUBLE
+  distrito : VARCHAR(255)
+  provincia : VARCHAR(255)
+  departamento : VARCHAR(255)
+}
+
+entity "reportes" {
+  * id : BIGSERIAL <<PK>>
+  --
+  * titulo : VARCHAR(255)
+  * descripcion : VARCHAR(1000)
+  * cuenta_id : BIGINT <<FK>>
+  * ubicacion_id : BIGINT <<FK>>
+  tecnico_id : BIGINT <<FK>>
+  tipo_problema : VARCHAR(50)
+  * estado : VARCHAR(50)
+  fecha_creacion : TIMESTAMP
+  fecha_actualizacion : TIMESTAMP
+  comentario_resolucion : VARCHAR(1000)
+  fecha_cierre : TIMESTAMP
+}
+
+entity "fotos" {
+  * id : BIGSERIAL <<PK>>
+  --
+  * reporte_id : BIGINT <<FK>>
+  * url : VARCHAR(500)
+  * tipo : VARCHAR(20)
+  descripcion : VARCHAR(255)
+  * fecha_carga : TIMESTAMP
+}
+
+entity "historial_estados" {
+  * id : BIGSERIAL <<PK>>
+  --
+  * reporte_id : BIGINT <<FK>>
+  estado_anterior : VARCHAR(50)
+  * estado_nuevo : VARCHAR(50)
+  * fecha_cambio : TIMESTAMP
+}
+
+entity "token_notificaciones" {
+  * id : BIGSERIAL <<PK>>
+  --
+  * cuenta_id : BIGINT <<FK, UNIQUE>>
+  * token : VARCHAR(512)
+}
+
+' === Relaciones ===
+
+cuentas ||--|| personas : persona_id
+
+operadores_municipales ||--|| cuentas : id
+tecnicos ||--|| cuentas : id
+ciudadanos ||--|| cuentas : id
+
+reportes }o--|| cuentas : cuenta_id
+reportes ||--|| ubicaciones : ubicacion_id
+reportes }o--o| tecnicos : tecnico_id
+
+fotos }o--|| reportes : reporte_id
+historial_estados }o--|| reportes : reporte_id
+token_notificaciones ||--|| cuentas : cuenta_id
+
+note bottom of reportes
+  <b>estado</b>: PENDIENTE | REVISION | FINALIZADO | RECHAZADO
+  <b>tipo_problema</b>: INFRAESTRUCTURA | RESIDUOS | SEGURIDAD | ALUMBRADO | OTRO
+end note
+
+note bottom of fotos
+  <b>tipo</b>: INICIAL | FINAL
+end note
+
+note bottom of cuentas
+  Herencia JOINED:
+  operadores_municipales,
+  tecnicos, ciudadanos
+end note
+
+@enduml
