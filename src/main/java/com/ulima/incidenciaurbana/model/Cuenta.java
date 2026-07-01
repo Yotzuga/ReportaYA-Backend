@@ -43,6 +43,12 @@ public abstract class Cuenta {
     @Column(name = "token_expiracion")
     private LocalDateTime tokenExpiracion;
 
+    @Column(name = "token_recuperacion")
+    private String tokenRecuperacion;
+
+    @Column(name = "token_recuperacion_expiracion")
+    private LocalDateTime tokenRecuperacionExpiracion;
+
     // Constructors
     public Cuenta() {
         this.fechaCreacion = LocalDateTime.now();
@@ -154,6 +160,22 @@ public abstract class Cuenta {
         this.tokenExpiracion = tokenExpiracion;
     }
 
+    public String getTokenRecuperacion() {
+        return tokenRecuperacion;
+    }
+
+    public void setTokenRecuperacion(String tokenRecuperacion) {
+        this.tokenRecuperacion = tokenRecuperacion;
+    }
+
+    public LocalDateTime getTokenRecuperacionExpiracion() {
+        return tokenRecuperacionExpiracion;
+    }
+
+    public void setTokenRecuperacionExpiracion(LocalDateTime tokenRecuperacionExpiracion) {
+        this.tokenRecuperacionExpiracion = tokenRecuperacionExpiracion;
+    }
+
     /**
      * Asigna un token de verificación de correo con su fecha de expiración.
      */
@@ -176,6 +198,20 @@ public abstract class Cuenta {
         this.activo = true;
         this.tokenVerificacion = null;
         this.tokenExpiracion = null;
+    }
+
+    public void asignarTokenRecuperacion(String token, LocalDateTime expiracion) {
+        this.tokenRecuperacion = token;
+        this.tokenRecuperacionExpiracion = expiracion;
+    }
+
+    public boolean tokenRecuperacionExpirado() {
+        return tokenRecuperacionExpiracion == null || tokenRecuperacionExpiracion.isBefore(LocalDateTime.now());
+    }
+
+    public void limpiarTokenRecuperacion() {
+        this.tokenRecuperacion = null;
+        this.tokenRecuperacionExpiracion = null;
     }
 
     /**

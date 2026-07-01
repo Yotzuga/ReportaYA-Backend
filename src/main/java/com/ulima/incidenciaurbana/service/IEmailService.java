@@ -1,7 +1,7 @@
 package com.ulima.incidenciaurbana.service;
 
 /**
- * Servicio de envío de correos (verificación de cuenta).
+ * Servicio de envío de correos.
  */
 public interface IEmailService {
 
@@ -13,4 +13,13 @@ public interface IEmailService {
      * @param token  token de verificación que viajará en el enlace
      */
     void enviarVerificacion(String correo, String nombre, String token);
+
+    /**
+     * Envía el correo con el enlace de recuperación de contraseña.
+     *
+     * @param correo correo destino
+     * @param nombre nombre del destinatario
+     * @param token  token de recuperación que viajará en el enlace
+     */
+    void enviarRecuperacionContrasena(String correo, String nombre, String token);
 }

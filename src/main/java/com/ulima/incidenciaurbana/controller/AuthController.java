@@ -37,7 +37,11 @@ public class AuthController {
     @PostMapping("/restablecer-password")
     public ResponseEntity<?> restablecerPassword(@RequestBody Map<String, String> body) {
         try {
-            authService.restablecerContrasena(body.get("correo"), body.get("nuevaContrasena"));
+            String nuevaContrasena = body.get("nuevaContrasena");
+            if (nuevaContrasena == null) {
+                nuevaContrasena = body.get("password");
+            }
+            authService.restablecerContrasena(body.get("token"), nuevaContrasena);
             return ResponseEntity.ok(Map.of("message", "Contrasena restablecida exitosamente"));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));

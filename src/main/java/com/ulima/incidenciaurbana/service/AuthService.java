@@ -8,5 +8,5 @@ public interface AuthService {
 
     void solicitarRecuperacion(String correo);
 
-    void restablecerContrasena(String correo, String nuevaContrasena);
+    void restablecerContrasena(String token, String nuevaContrasena);
 }

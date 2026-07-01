@@ -10,7 +10,9 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.HtmlUtils;
+import org.springframework.web.util.UriUtils;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -18,8 +20,8 @@ import java.util.Map;
 /**
  * Implementación de {@link IEmailService} usando la API HTTP de Resend.
  *
- * <p>Si {@code resend.api-key} está vacío, no falla: imprime el enlace de
- * verificación en consola (modo desarrollo), igual que el patrón de Firebase.
+ * <p>Si {@code resend.api-key} está vacío, no falla: imprime el enlace
+ * generado en consola (modo desarrollo), igual que el patrón de Firebase.
  */
 @Service
 public class ResendEmailServiceImpl implements IEmailService {
@@ -30,15 +32,18 @@ public class ResendEmailServiceImpl implements IEmailService {
     private final String apiKey;
     private final String from;
     private final String baseUrl;
+    private final String passwordResetUrl;
     private final RestClient restClient;
 
     public ResendEmailServiceImpl(
             @Value("${resend.api-key:}") String apiKey,
             @Value("${resend.from:onboarding@resend.dev}") String from,
-            @Value("${app.base-url:http://localhost:8081}") String baseUrl) {
+            @Value("${app.base-url:http://localhost:8081}") String baseUrl,
+            @Value("${app.password-reset-url:}") String passwordResetUrl) {
         this.apiKey = apiKey;
         this.from = from;
         this.baseUrl = baseUrl;
+        this.passwordResetUrl = passwordResetUrl;
 
         // Timeouts para no retener el hilo/recursos si Resend tarda o no responde.
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
@@ -50,18 +55,41 @@ public class ResendEmailServiceImpl implements IEmailService {
     @Override
     public void enviarVerificacion(String correo, String nombre, String token) {
         String enlace = baseUrl + "/api/cuenta/verificar?token=" + token;
+        enviarCorreo(
+                correo,
+                "Verifica tu cuenta de ReportaYA",
+                construirHtmlVerificacion(nombre, enlace),
+                enlace,
+                "verificacion");
+    }
 
+    @Override
+    public void enviarRecuperacionContrasena(String correo, String nombre, String token) {
+        String urlBase = (passwordResetUrl != null && !passwordResetUrl.isBlank())
+                ? passwordResetUrl
+                : baseUrl + "/reset-password";
+        String enlace = construirEnlaceRecuperacion(urlBase, token, correo);
+
+        enviarCorreo(
+                correo,
+                "Restablece tu contraseña de ReportaYA",
+                construirHtmlRecuperacion(nombre, enlace),
+                enlace,
+                "recuperacion de contrasena");
+    }
+
+    private void enviarCorreo(String correo, String subject, String html, String enlace, String tipo) {
         if (apiKey == null || apiKey.isBlank()) {
-            log.warn("[Resend] RESEND_API_KEY no configurada. Enlace de verificacion para {}: {}",
-                    correo, enlace);
+            log.warn("[Resend] RESEND_API_KEY no configurada. Enlace de {} para {}: {}",
+                    tipo, correo, enlace);
             return;
         }
 
         Map<String, Object> payload = Map.of(
                 "from", from,
                 "to", List.of(correo),
-                "subject", "Verifica tu cuenta de ReportaYA",
-                "html", construirHtml(nombre, enlace));
+                "subject", subject,
+                "html", html);
 
         try {
             restClient.post()
@@ -71,15 +99,37 @@ public class ResendEmailServiceImpl implements IEmailService {
                     .body(payload)
                     .retrieve()
                     .toBodilessEntity();
-            log.info("[Resend] Correo de verificacion enviado a {}", correo);
+            log.info("[Resend] Correo de {} enviado a {}", tipo, correo);
         } catch (Exception e) {
-            // No rompemos el registro si falla el envío: dejamos el enlace en logs.
-            log.error("[Resend] Error enviando correo a {}: {}. Enlace: {}",
-                    correo, e.getMessage(), enlace);
+            log.error("[Resend] Error enviando correo de {} a {}: {}. Enlace: {}",
+                    tipo, correo, e.getMessage(), enlace);
         }
     }
 
-    private String construirHtml(String nombre, String enlace) {
+    private String construirEnlaceRecuperacion(String urlBase, String token, String correo) {
+        String tokenSeguro = UriUtils.encodeQueryParam(token, StandardCharsets.UTF_8);
+        String correoSeguro = UriUtils.encodeQueryParam(correo, StandardCharsets.UTF_8);
+        boolean incluyeToken = urlBase.contains("{token}") || urlBase.contains("token=");
+        boolean incluyeCorreo = urlBase.contains("{correo}") || urlBase.contains("correo=");
+        if (urlBase.contains("{token}")) {
+            urlBase = urlBase.replace("{token}", tokenSeguro);
+        }
+        if (urlBase.contains("{correo}")) {
+            urlBase = urlBase.replace("{correo}", correoSeguro);
+        }
+        String separador = urlBase.contains("?") ? "&" : "?";
+        String enlace = urlBase;
+        if (!incluyeToken) {
+            enlace += separador + "token=" + tokenSeguro;
+            separador = "&";
+        }
+        if (!incluyeCorreo) {
+            enlace += separador + "correo=" + correoSeguro;
+        }
+        return enlace;
+    }
+
+    private String construirHtmlVerificacion(String nombre, String enlace) {
         // Escapamos el nombre (dato del usuario) para evitar inyección de HTML en el correo.
         String saludo = (nombre != null && !nombre.isBlank()) ? HtmlUtils.htmlEscape(nombre) : "";
         return """
@@ -92,6 +142,22 @@ public class ResendEmailServiceImpl implements IEmailService {
                   </p>
                   <p style="font-size:13px; color:#71717a;">Si el boton no funciona, copia y pega este enlace en tu navegador:<br>%s</p>
                   <p style="font-size:13px; color:#71717a;">Este enlace caduca en 24 horas. Si no creaste esta cuenta, ignora este correo.</p>
+                </div>
+                """.formatted(saludo, enlace, enlace);
+    }
+
+    private String construirHtmlRecuperacion(String nombre, String enlace) {
+        String saludo = (nombre != null && !nombre.isBlank()) ? HtmlUtils.htmlEscape(nombre) : "";
+        return """
+                <div style="font-family: system-ui, sans-serif; max-width:480px; margin:0 auto; padding:24px; color:#18181b;">
+                  <h2 style="color:#7c3aed;">ReportaYA</h2>
+                  <p>Hola %s, recibimos una solicitud para restablecer tu contraseña.</p>
+                  <p>Haz clic en el siguiente boton para crear una nueva contraseña:</p>
+                  <p style="text-align:center; margin:32px 0;">
+                    <a href="%s" style="background:#7c3aed; color:#fff; padding:12px 28px; border-radius:8px; text-decoration:none; font-weight:600;">Restablecer contraseña</a>
+                  </p>
+                  <p style="font-size:13px; color:#71717a;">Si el boton no funciona, copia y pega este enlace en tu navegador:<br>%s</p>
+                  <p style="font-size:13px; color:#71717a;">Este enlace caduca en 30 minutos. Si no solicitaste este cambio, ignora este correo.</p>
                 </div>
                 """.formatted(saludo, enlace, enlace);
     }

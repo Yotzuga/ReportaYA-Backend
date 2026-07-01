@@ -21,13 +21,13 @@ Content-Type: application/json
 
 {
   "tipoCuenta": "CIUDADANO",
-  "usuario": "demo.reportaya",
+  "usuario": "demo2.reportaya",
   "contrasena": "123456",
   "nombres": "Demo",
   "apellidos": "ReportaYA",
-  "dni": "10000001",
+  "dni": "76951422",
   "telefono": "999888777",
-  "correo": "jjjangelosss@gmail.com",
+  "correo": "jeffxdangeloss@gmail.com",
   "activo": true
 }
 
