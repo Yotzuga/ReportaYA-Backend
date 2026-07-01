@@ -7,24 +7,33 @@ import com.ulima.incidenciaurbana.exception.InvalidCredentialsException;
 import com.ulima.incidenciaurbana.model.Cuenta;
 import com.ulima.incidenciaurbana.repository.CuentaRepository;
 import com.ulima.incidenciaurbana.service.AuthService;
+import com.ulima.incidenciaurbana.service.IEmailService;
 import com.ulima.incidenciaurbana.util.JwtUtil;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.util.UUID;
+
 @Service
 public class AuthServiceImpl implements AuthService {
+
+    private static final int MINUTOS_VALIDEZ_RECUPERACION = 30;
 
     private final CuentaRepository cuentaRepository;
     private final BCryptPasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final IEmailService emailService;
 
     public AuthServiceImpl(CuentaRepository cuentaRepository,
                            BCryptPasswordEncoder passwordEncoder,
-                           JwtUtil jwtUtil) {
+                           JwtUtil jwtUtil,
+                           IEmailService emailService) {
         this.cuentaRepository = cuentaRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
+        this.emailService = emailService;
     }
 
     @Override
@@ -63,29 +72,46 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public void solicitarRecuperacion(String correo) {
         if (correo == null || correo.trim().isEmpty()) {
             throw new RuntimeException("El correo es obligatorio");
         }
-        cuentaRepository.findByCorreoAndActivoTrue(correo.trim())
+
+        Cuenta cuenta = cuentaRepository.findByCorreoAndActivoTrue(correo.trim())
                 .orElseThrow(() -> new RuntimeException("El correo no esta asociado a ninguna cuenta"));
+
+        String token = UUID.randomUUID().toString();
+        cuenta.asignarTokenRecuperacion(token, LocalDateTime.now().plusMinutes(MINUTOS_VALIDEZ_RECUPERACION));
+        cuentaRepository.save(cuenta);
+
+        emailService.enviarRecuperacionContrasena(
+                cuenta.getPersona().getCorreo(),
+                cuenta.getPersona().getNombres(),
+                token);
     }
 
     @Override
     @Transactional
-    public void restablecerContrasena(String correo, String nuevaContrasena) {
-        if (correo == null || correo.trim().isEmpty()) {
-            throw new RuntimeException("El correo es obligatorio");
+    public void restablecerContrasena(String token, String nuevaContrasena) {
+        if (token == null || token.trim().isEmpty()) {
+            throw new RuntimeException("El token de recuperacion es obligatorio");
         }
         if (nuevaContrasena == null || nuevaContrasena.length() < 6) {
             throw new RuntimeException("La contrasena debe tener al menos 6 caracteres");
         }
 
-        Cuenta cuenta = cuentaRepository.findByCorreoAndActivoTrue(correo.trim())
-                .orElseThrow(() -> new RuntimeException("No se encontro una cuenta asociada a este correo"));
+        Cuenta cuenta = cuentaRepository.findByTokenRecuperacion(token.trim())
+                .orElseThrow(() -> new RuntimeException("Enlace de recuperacion invalido o ya utilizado"));
+
+        if (cuenta.tokenRecuperacionExpirado()) {
+            cuenta.limpiarTokenRecuperacion();
+            cuentaRepository.save(cuenta);
+            throw new RuntimeException("El enlace de recuperacion ha expirado. Solicita uno nuevo.");
+        }
 
         cuenta.cambiarContrasena(passwordEncoder.encode(nuevaContrasena));
+        cuenta.limpiarTokenRecuperacion();
         cuentaRepository.save(cuenta);
     }
 

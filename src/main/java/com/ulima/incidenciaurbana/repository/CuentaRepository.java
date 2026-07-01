@@ -16,6 +16,8 @@ public interface CuentaRepository extends JpaRepository<Cuenta, Long> {
 
     Optional<Cuenta> findByTokenVerificacion(String token);
 
+    Optional<Cuenta> findByTokenRecuperacion(String token);
+
     @org.springframework.data.jpa.repository.Query(
             "SELECT c FROM Cuenta c JOIN c.persona p WHERE LOWER(p.correo) = LOWER(:correo) AND c.activo = true")
     Optional<Cuenta> findByCorreoAndActivoTrue(@org.springframework.data.repository.query.Param("correo") String correo);

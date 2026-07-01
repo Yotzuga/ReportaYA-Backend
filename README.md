@@ -9,6 +9,7 @@ Backend REST API del sistema de gestion de reportes urbanos **ReportaYA**, desar
 - PostgreSQL
 - JWT (jjwt 0.12.3) para autenticacion
 - BCrypt para hash de contrasenas
+- Resend para verificacion de correo y recuperacion de contrasena
 - Firebase Storage para almacenamiento de fotos
 - Firebase Cloud Messaging para notificaciones push
 
@@ -17,6 +18,7 @@ Backend REST API del sistema de gestion de reportes urbanos **ReportaYA**, desar
 - Java 17+
 - Maven 3.9+
 - PostgreSQL
+- (Opcional) Cuenta/API key de Resend para correos reales
 - (Opcional) Firebase service account key para fotos y notificaciones
 
 ## Configuracion
@@ -33,12 +35,18 @@ FIREBASE_STORAGE_BUCKET=tu-proyecto.firebasestorage.app
 RESEND_API_KEY=re_tu_api_key
 RESEND_FROM=ReportaYA <noreply@tu-dominio-verificado>
 APP_BASE_URL=http://localhost:8081
+APP_PASSWORD_RESET_URL=reportaya://reset-password
 ```
 
 > **Verificacion de correo (Resend):** al registrar un ciudadano se envia un
 > correo con un enlace de verificacion. La cuenta nace **inactiva** y no puede
 > iniciar sesion hasta confirmar el correo. Si `RESEND_API_KEY` esta vacio, el
 > enlace se imprime en consola (modo dev) y no se envia correo.
+>
+> **Recuperacion de contrasena (Resend):** `POST /api/auth/recuperar-password`
+> genera un token temporal y envia un enlace al correo. `APP_PASSWORD_RESET_URL`
+> debe apuntar a la pantalla del front/mobile que recibe `token` y `correo`
+> por query params.
 
 3. (Opcional) Colocar `firebase-service-account.json` en `src/main/resources/` para habilitar Firebase Storage y notificaciones push. Sin este archivo, las fotos se guardan localmente y las notificaciones se simulan en consola.
 
@@ -83,8 +91,8 @@ El token se obtiene con `POST /api/auth/login` y tiene validez de 24 horas.
 | Metodo | Ruta | Descripcion | CU |
 |---|---|---|---|
 | POST | `/api/auth/login` | Iniciar sesion (retorna 403 si la cuenta aun no verifico su correo) | CU-01 |
-| POST | `/api/auth/recuperar-password` | Solicitar recuperacion de contrasena | CU-03 |
-| POST | `/api/auth/restablecer-password` | Restablecer contrasena | CU-03 |
+| POST | `/api/auth/recuperar-password` | Solicitar enlace de recuperacion por correo (`{"correo":"..."}`) | CU-03 |
+| POST | `/api/auth/restablecer-password` | Restablecer contrasena usando token (`{"token":"...","nuevaContrasena":"..."}`) | CU-03 |
 
 ### Registro (`/api/cuenta`) — Publico
 
@@ -172,6 +180,43 @@ hasta confirmar el correo. El envio del enlace se hace con [Resend](https://rese
 
 Probar el flujo completo con `api-tests/07-verificacion-correo.rest`.
 
+## Recuperacion de contrasena por correo (Resend)
+
+Desde el boton **"Olvidaste tu contrasena?"** del login, el front envia el
+correo del usuario al backend. Si la cuenta existe y esta activa, se genera un
+token temporal y se envia un enlace por Resend.
+
+```
+1. Usuario pide recuperar contrasena  → POST /api/auth/recuperar-password       (correo enviado)
+2. Usuario abre el enlace del correo  → reportaya://reset-password?token=...&correo=...
+3. Usuario ingresa nueva contrasena   → POST /api/auth/restablecer-password     (cambia password)
+4. Usuario inicia sesion              → POST /api/auth/login                    → 200 + JWT
+```
+
+Payload para solicitar el enlace:
+
+```json
+{
+  "correo": "ana.quispe@mail.com"
+}
+```
+
+Payload para cambiar la contrasena:
+
+```json
+{
+  "token": "TOKEN_DEL_CORREO",
+  "nuevaContrasena": "123456"
+}
+```
+
+- **Token:** UUID con validez de 30 minutos, guardado en `cuentas.token_recuperacion`; se limpia al restablecer la contrasena.
+- **Enlace:** se construye con `APP_PASSWORD_RESET_URL` y el backend agrega `token` y `correo` como query params.
+- **Modo dev:** si `RESEND_API_KEY` esta vacio, el enlace se imprime en consola.
+- **Validacion backend:** la nueva contrasena debe tener al menos 6 caracteres.
+
+Probar el flujo completo con `api-tests/08-recuperacion-password.rest`.
+
 ## Flujo de estados
 
 ```
@@ -242,3 +287,4 @@ La carpeta `api-tests/` contiene archivos `.rest` para probar todos los endpoint
 | `05-tecnico.rest` | Reportes asignados + completar con fotos |
 | `06-sin-token.rest` | Verificar seguridad JWT |
 | `07-verificacion-correo.rest` | Registro + verificacion de correo (Resend) + login |
+| `08-recuperacion-password.rest` | Recuperacion de contrasena por correo (Resend) |
