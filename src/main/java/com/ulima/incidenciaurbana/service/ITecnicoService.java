@@ -9,6 +9,8 @@ public interface ITecnicoService {
 
     Page<TecnicoDTO> obtenerTodosTecnicos(int page);
 
+    TecnicoDTO obtenerTecnicoPorId(Long id);
+
     Page<ReporteDTO> obtenerReportesAsignados(Long tecnicoId, String estado, int page);
 
     ReporteDTO completarReporte(Long tecnicoId, Long reporteId, CompletarReporteRequest request);

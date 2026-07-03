@@ -35,15 +35,11 @@ public class TecnicoController {
     @GetMapping("/{id}")
     public ResponseEntity<?> obtenerTecnico(@PathVariable Long id) {
         try {
-            Page<TecnicoDTO> page = tecnicoService.obtenerTodosTecnicos(0);
-            return page.getContent().stream()
-                    .filter(t -> t.getId().equals(id))
-                    .findFirst()
-                    .map(t -> ResponseEntity.ok((Object) t))
-                    .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND)
-                            .body(Map.of("error", "Tecnico no encontrado con id: " + id)));
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+            TecnicoDTO tecnico = tecnicoService.obtenerTecnicoPorId(id);
+            return ResponseEntity.ok(tecnico);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", e.getMessage()));
         }
     }
 
