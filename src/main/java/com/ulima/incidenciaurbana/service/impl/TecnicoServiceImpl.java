@@ -59,6 +59,18 @@ public class TecnicoServiceImpl implements ITecnicoService {
     }
 
     @Override
+    public TecnicoDTO obtenerTecnicoPorId(Long id) {
+        return tecnicoRepository.findById(id)
+                .map(tecnico -> new TecnicoDTO(
+                        tecnico.getId(),
+                        tecnico.getUsuario(),
+                        tecnico.getPersona().getNombres(),
+                        tecnico.getPersona().getApellidos(),
+                        tecnico.getPersona().getCorreo()))
+                .orElseThrow(() -> new IllegalArgumentException("Tecnico no encontrado con id: " + id));
+    }
+
+    @Override
     public Page<ReporteDTO> obtenerReportesAsignados(Long tecnicoId, String estado, int page) {
         Pageable pageable = PageRequest.of(page, PAGE_SIZE, Sort.by("id").descending());
 

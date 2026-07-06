@@ -3,7 +3,15 @@
 ### ==========================================
 ### INSTRUCCION: Primero ejecuta el login de tecnico (tec.carlos) en 01-auth.rest
 ### y copia el token aqui:
-@token = 
+@token = eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiI0IiwidXN1YXJpbyI6InRlYy5jYXJsb3MiLCJ0aXBvQ3VlbnRhIjoiVEVDTklDTyIsImlhdCI6MTc4MzA1MDEwMSwiZXhwIjoxNzgzMTM2NTAxfQ.0tMuM5_7K9MeJECzYJdgQ7vLD2ZyvKuGfXcVr5-m7wQlVbIqnz6V-XS_MNXcq9O2exD_RcLCBuRmtRKIMDHuqQ
+
+### Obtener todos los técnicos (paginado)
+GET http://localhost:8081/api/tecnicos?page=0
+Authorization: Bearer {{token}}
+
+### Obtener técnico por ID
+GET http://localhost:8081/api/tecnicos/4
+Authorization: Bearer {{token}}
 
 ### Obtener reportes asignados en REVISION
 GET http://localhost:8081/api/tecnicos/4/reportes?estado=REVISION&page=0
