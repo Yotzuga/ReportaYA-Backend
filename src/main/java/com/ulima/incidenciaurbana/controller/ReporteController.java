@@ -13,7 +13,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/reportes")
@@ -118,6 +120,26 @@ public class ReporteController {
             return ResponseEntity.badRequest().body(Map.of("error", "Tipo de foto invalido. Use INICIAL o FINAL"));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/{id}/fotos")
+    public ResponseEntity<?> obtenerFotos(
+            @PathVariable Long id,
+            @RequestParam(name = "tipo", required = false) String tipo) {
+        try {
+            ReporteDTO reporte = queryService.obtenerReportePorId(id);
+            if (reporte.getFotos() == null) {
+                return ResponseEntity.ok(List.of());
+            }
+            if (tipo != null && !tipo.trim().isEmpty()) {
+                return ResponseEntity.ok(reporte.getFotos().stream()
+                        .filter(f -> f.getTipo().name().equalsIgnoreCase(tipo.trim()))
+                        .collect(Collectors.toList()));
+            }
+            return ResponseEntity.ok(reporte.getFotos());
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
         }
     }
 
