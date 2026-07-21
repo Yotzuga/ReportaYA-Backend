@@ -55,7 +55,10 @@ public class TecnicoServiceImpl implements ITecnicoService {
                 tecnico.getUsuario(),
                 tecnico.getPersona().getNombres(),
                 tecnico.getPersona().getApellidos(),
-                tecnico.getPersona().getCorreo()));
+                tecnico.getPersona().getCorreo(),
+                tecnico.getPersona().getDni(),
+                tecnico.getPersona().getTelefono(),
+                tecnico.isActivo()));
     }
 
     @Override
@@ -66,7 +69,10 @@ public class TecnicoServiceImpl implements ITecnicoService {
                         tecnico.getUsuario(),
                         tecnico.getPersona().getNombres(),
                         tecnico.getPersona().getApellidos(),
-                        tecnico.getPersona().getCorreo()))
+                        tecnico.getPersona().getCorreo(),
+                        tecnico.getPersona().getDni(),
+                        tecnico.getPersona().getTelefono(),
+                        tecnico.isActivo()))
                 .orElseThrow(() -> new IllegalArgumentException("Tecnico no encontrado con id: " + id));
     }
 
