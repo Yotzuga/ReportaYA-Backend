@@ -34,4 +34,16 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(Map.of("error", ex.getMessage()));
     }
+
+    // [local-dev] Sin esto Spring responde {"error":"Unauthorized"/"Forbidden"} y la app
+    // muestra ese texto en ingles en lugar del mensaje real del login.
+    @ExceptionHandler(com.ulima.incidenciaurbana.exception.InvalidCredentialsException.class)
+    public ResponseEntity<?> handleInvalidCredentials(RuntimeException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", ex.getMessage()));
+    }
+
+    @ExceptionHandler(com.ulima.incidenciaurbana.exception.EmailNotVerifiedException.class)
+    public ResponseEntity<?> handleEmailNotVerified(RuntimeException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", ex.getMessage()));
+    }
 }

@@ -27,6 +27,10 @@ public class FotoServiceImpl implements IFotoService {
     private final ReporteRepository reporteRepository;
     private final IFirebaseStorageService firebaseStorageService;
 
+    // [local-dev] URL publica del backend para armar enlaces absolutos a fotos locales.
+    @org.springframework.beans.factory.annotation.Value("${app.base-url:http://localhost:8081}")
+    private String baseUrl;
+
     @Autowired
     public FotoServiceImpl(FotoRepository fotoRepository,
             ReporteRepository reporteRepository,
@@ -61,7 +65,7 @@ public class FotoServiceImpl implements IFotoService {
                 Path filePath = dirPath.resolve(nombreArchivo);
                 Files.createDirectories(filePath.getParent());
                 Files.write(filePath, decodedBytes);
-                urlFoto = "uploads/fotos/" + nombreArchivo;
+                urlFoto = baseUrl + "/uploads/fotos/" + nombreArchivo; // [local-dev] antes era ruta relativa
             } catch (IOException e) {
                 throw new RuntimeException("Error al guardar foto localmente: " + e.getMessage(), e);
             }
