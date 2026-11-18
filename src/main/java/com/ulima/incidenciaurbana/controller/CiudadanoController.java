@@ -1,5 +1,6 @@
 package com.ulima.incidenciaurbana.controller;
 
+import com.ulima.incidenciaurbana.util.ApiErrores;
 import com.ulima.incidenciaurbana.dto.CiudadanoDTO;
 import com.ulima.incidenciaurbana.service.ICiudadanoService;
 import com.ulima.incidenciaurbana.util.RequestAuth;
@@ -30,7 +31,7 @@ public class CiudadanoController {
             CiudadanoDTO ciudadano = ciudadanoService.obtenerCiudadanoPorId(id);
             return ResponseEntity.ok(ciudadano);
         } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", ApiErrores.mensaje(e)));
         }
     }
 
@@ -44,7 +45,7 @@ public class CiudadanoController {
             CiudadanoDTO actualizado = ciudadanoService.actualizarCiudadano(id, ciudadanoDTO);
             return ResponseEntity.ok(actualizado);
         } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", ApiErrores.mensaje(e)));
         }
     }
 
@@ -56,7 +57,7 @@ public class CiudadanoController {
             ciudadanoService.eliminarCiudadano(id);
             return new ResponseEntity<>(HttpStatus.NO_CONTENT);
         } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", ApiErrores.mensaje(e)));
         }
     }
 }

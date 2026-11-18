@@ -1,5 +1,6 @@
 package com.ulima.incidenciaurbana.controller;
 
+import com.ulima.incidenciaurbana.util.ApiErrores;
 import com.ulima.incidenciaurbana.dto.FotoDTO;
 import com.ulima.incidenciaurbana.dto.ReporteDTO;
 import com.ulima.incidenciaurbana.exception.ForbiddenException;
@@ -55,7 +56,7 @@ public class ReporteController {
         try {
             return new ResponseEntity<>(reporteService.crearReporte(reporteDTO), HttpStatus.CREATED);
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", ApiErrores.mensaje(e)));
         }
     }
 
@@ -90,7 +91,7 @@ public class ReporteController {
         try {
             reporte = queryService.obtenerReportePorId(id);
         } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", ApiErrores.mensaje(e)));
         }
         verificarLecturaDetalle(reporte, request);
         return ResponseEntity.ok(reporte);
@@ -104,7 +105,7 @@ public class ReporteController {
         try {
             return ResponseEntity.ok(reporteService.actualizarReporte(id, reporteDTO));
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", ApiErrores.mensaje(e)));
         }
     }
 
@@ -116,7 +117,7 @@ public class ReporteController {
         try {
             return ResponseEntity.ok(reporteService.cambiarEstadoReporte(id, nuevoEstado));
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", ApiErrores.mensaje(e)));
         }
     }
 
@@ -131,7 +132,7 @@ public class ReporteController {
         try {
             return ResponseEntity.ok(reporteService.rechazarReporte(id, motivo.trim()));
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", ApiErrores.mensaje(e)));
         }
     }
 
@@ -156,7 +157,7 @@ public class ReporteController {
         try {
             reporte = queryService.obtenerReportePorId(id);
         } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", ApiErrores.mensaje(e)));
         }
         // INICIAL: el ciudadano dueño del reporte (o un operador). FINAL: solo via
         // PATCH /api/tecnicos/{id}/reportes/{rid}/completar (o un operador).
@@ -170,7 +171,7 @@ public class ReporteController {
             FotoDTO foto = fotoService.subirFoto(id, archivoBase64, tipo, descripcion);
             return new ResponseEntity<>(foto, HttpStatus.CREATED);
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", ApiErrores.mensaje(e)));
         }
     }
 
@@ -190,7 +191,7 @@ public class ReporteController {
             }
             return ResponseEntity.ok(reporte.getFotos());
         } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", ApiErrores.mensaje(e)));
         }
     }
 
@@ -201,7 +202,7 @@ public class ReporteController {
             reporteService.eliminarReporte(id);
             return new ResponseEntity<>(HttpStatus.NO_CONTENT);
         } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", ApiErrores.mensaje(e)));
         }
     }
 

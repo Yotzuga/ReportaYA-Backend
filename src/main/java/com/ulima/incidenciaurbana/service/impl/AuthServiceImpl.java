@@ -80,8 +80,10 @@ public class AuthServiceImpl implements AuthService {
             throw new RuntimeException("El correo es obligatorio");
         }
 
-        Cuenta cuenta = cuentaRepository.findByCorreoAndActivoTrue(correo.trim())
-                .orElseThrow(() -> new RuntimeException("El correo no esta asociado a ninguna cuenta"));
+        // Respuesta uniforme: si el correo no existe no se informa (anti-enumeracion),
+        // igual que dice el mensaje del controlador.
+        Cuenta cuenta = cuentaRepository.findByCorreoAndActivoTrue(correo.trim()).orElse(null);
+        if (cuenta == null) return;
 
         String token = generarCodigoRecuperacion();
         cuenta.asignarTokenRecuperacion(token, LocalDateTime.now().plusMinutes(MINUTOS_VALIDEZ_RECUPERACION));
@@ -104,12 +106,12 @@ public class AuthServiceImpl implements AuthService {
         }
 
         Cuenta cuenta = cuentaRepository.findByTokenRecuperacion(token.trim())
-                .orElseThrow(() -> new RuntimeException("Enlace de recuperacion invalido o ya utilizado"));
+                .orElseThrow(() -> new RuntimeException("Codigo de recuperacion invalido o ya utilizado"));
 
         if (cuenta.tokenRecuperacionExpirado()) {
             cuenta.limpiarTokenRecuperacion();
             cuentaRepository.save(cuenta);
-            throw new RuntimeException("El enlace de recuperacion ha expirado. Solicita uno nuevo.");
+            throw new RuntimeException("El codigo de recuperacion ha expirado. Solicita uno nuevo.");
         }
 
         cuenta.cambiarContrasena(passwordEncoder.encode(nuevaContrasena));

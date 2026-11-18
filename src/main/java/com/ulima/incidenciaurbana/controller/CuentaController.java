@@ -1,5 +1,6 @@
 package com.ulima.incidenciaurbana.controller;
 
+import com.ulima.incidenciaurbana.util.ApiErrores;
 import com.ulima.incidenciaurbana.dto.CuentaDTO;
 import com.ulima.incidenciaurbana.service.ICuentaService;
 import jakarta.validation.Valid;
@@ -28,9 +29,9 @@ public class CuentaController {
             CuentaDTO cuentaCreada = cuentaService.crearCuenta(cuentaDTO);
             return new ResponseEntity<>(cuentaCreada, HttpStatus.CREATED);
         } catch (IllegalArgumentException e) {
-            return new ResponseEntity<>(Map.of("error", e.getMessage()), HttpStatus.BAD_REQUEST);
+            return new ResponseEntity<>(Map.of("error", ApiErrores.mensaje(e)), HttpStatus.BAD_REQUEST);
         } catch (RuntimeException e) {
-            return new ResponseEntity<>(Map.of("error", e.getMessage()), HttpStatus.BAD_REQUEST);
+            return new ResponseEntity<>(Map.of("error", ApiErrores.mensaje(e)), HttpStatus.BAD_REQUEST);
         }
     }
 
@@ -50,7 +51,7 @@ public class CuentaController {
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .contentType(MediaType.TEXT_HTML)
-                    .body(paginaHtml("No se pudo verificar", e.getMessage(), false));
+                    .body(paginaHtml("No se pudo verificar", ApiErrores.mensaje(e), false));
         }
     }
 
@@ -61,7 +62,7 @@ public class CuentaController {
             return ResponseEntity.ok(Map.of(
                     "message", "Si el correo existe y aun no esta verificado, te reenviamos el enlace."));
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", ApiErrores.mensaje(e)));
         }
     }
 

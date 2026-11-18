@@ -1,5 +1,6 @@
 package com.ulima.incidenciaurbana.controller;
 
+import com.ulima.incidenciaurbana.util.ApiErrores;
 import com.ulima.incidenciaurbana.dto.CompletarReporteRequest;
 import com.ulima.incidenciaurbana.dto.ReporteDTO;
 import com.ulima.incidenciaurbana.dto.TecnicoDTO;
@@ -46,7 +47,7 @@ public class TecnicoController {
             return ResponseEntity.ok(tecnico);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("error", e.getMessage()));
+                    .body(Map.of("error", ApiErrores.mensaje(e)));
         }
     }
 
@@ -61,7 +62,7 @@ public class TecnicoController {
         try {
             return ResponseEntity.ok(tecnicoService.obtenerReportesAsignados(id, estado, page));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", ApiErrores.mensaje(e)));
         }
     }
 
@@ -86,10 +87,10 @@ public class TecnicoController {
                     "fotosAdjuntadas", request.getFotos().size(),
                     "estadoFinal", "FINALIZADO"));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", ApiErrores.mensaje(e)));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", e.getMessage()));
+                    .body(Map.of("error", ApiErrores.mensaje(e)));
         }
     }
 }

@@ -67,4 +67,11 @@ public class GlobalExceptionHandler {
             org.springframework.web.bind.MissingServletRequestParameterException ex) {
         return ResponseEntity.badRequest().body(Map.of("error", "Falta el parametro '" + ex.getParameterName() + "'"));
     }
+
+    /** Violacion de restricciones de BD que se escape a las validaciones previas. */
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ResponseEntity<?> handleDataIntegrity(Exception ex) {
+        return ResponseEntity.badRequest()
+                .body(Map.of("error", "Los datos no son validos o ya existen. Revisa la informacion enviada."));
+    }
 }

@@ -44,6 +44,17 @@ public class CuentaServiceImpl implements ICuentaService {
                     "El registro publico solo permite crear cuentas de tipo CIUDADANO");
         }
 
+        // Duplicados: mensaje claro en vez del error SQL de la restriccion UNIQUE.
+        if (dto.getUsuario() != null && cuentaRepository.existsByUsuarioIgnoreCase(dto.getUsuario().trim())) {
+            throw new IllegalArgumentException("El usuario ya esta en uso. Elige otro.");
+        }
+        if (dto.getDni() != null && cuentaRepository.existsByPersonaDni(dto.getDni().trim())) {
+            throw new IllegalArgumentException("Ya existe una cuenta con ese DNI.");
+        }
+        if (dto.getCorreo() != null && cuentaRepository.findByCorreo(dto.getCorreo().trim()).isPresent()) {
+            throw new IllegalArgumentException("Ya existe una cuenta con ese correo.");
+        }
+
         Persona persona = new Persona(
                 dto.getNombres(), dto.getApellidos(), dto.getDni(),
                 dto.getTelefono(), dto.getCorreo());

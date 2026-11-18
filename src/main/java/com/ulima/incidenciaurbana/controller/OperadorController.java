@@ -1,5 +1,6 @@
 package com.ulima.incidenciaurbana.controller;
 
+import com.ulima.incidenciaurbana.util.ApiErrores;
 import com.ulima.incidenciaurbana.dto.ReporteDTO;
 import com.ulima.incidenciaurbana.service.IOperadorService;
 import com.ulima.incidenciaurbana.util.RequestAuth;
@@ -47,7 +48,7 @@ public class OperadorController {
             ReporteDTO reporte = operadorService.aceptarReporte(id, RequestAuth.cuentaId(request));
             return ResponseEntity.ok(reporte);
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", ApiErrores.mensaje(e)));
         }
     }
 
@@ -63,7 +64,7 @@ public class OperadorController {
             ReporteDTO reporte = operadorService.rechazarReporte(id, RequestAuth.cuentaId(request), motivo);
             return ResponseEntity.ok(reporte);
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", ApiErrores.mensaje(e)));
         }
     }
 }
