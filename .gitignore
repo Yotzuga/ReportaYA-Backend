@@ -73,3 +73,6 @@ hs_err_pid*
 
 # Keep readme
 !README.md
+
+# Credenciales del sketch IoT (ver iot/reportaya_poste/secrets.example.h)
+iot/**/secrets.h

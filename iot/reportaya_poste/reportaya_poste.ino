@@ -27,10 +27,12 @@
     - ESP32Servo
     (WiFi.h y HTTPClient.h vienen con el core ESP32)
 
-  ANTES DE FLASHEAR — edita el bloque CONFIG:
-    - BASE_URL con la IP LAN del laptop del backend (NO localhost).
-    - SVC_CUENTA_ID con el id que devuelve db/seed-cuenta-iot.sql.
+  ANTES DE FLASHEAR:
+    - Copia secrets.example.h como secrets.h (no se sube a Git) y completa
+      WiFi, backend (nube https o PC local http://IP:8081) y la cuenta poste_iot.
     - POSTE_LAT / POSTE_LNG con la esquina que quieras representar.
+    - Con https el certificado del servidor se VERIFICA contra root_ca.h.
+      Solo para pruebas puedes definir RY_TLS_INSECURE en secrets.h.
 
   Este sketch es autocontenido para la demo. Si quieres conservar tu
   semaforo/servos originales, copia las funciones ry_* y la FSM a tu
@@ -45,16 +47,21 @@
 #include <LiquidCrystal_I2C.h>
 #include <ESP32Servo.h>
 
+#if __has_include("secrets.h")
+#include "secrets.h"
+#else
+#error "Falta secrets.h: copia secrets.example.h como secrets.h y completa tus datos."
+#endif
+#include "root_ca.h"
+
 // ======================= CONFIG (EDITAR) =======================
-const char*  WIFI_SSID      = "TU_RED_WIFI";       // <-- SSID de tu red (hotspot/router)
-const char*  WIFI_PASS      = "TU_PASSWORD_WIFI";  // <-- contrasena de esa red
-String       BASE_URL       = "https://reportaya-backend.onrender.com";  // <-- backend DESPLEGADO (HTTPS)
-// El poste apunta al backend publico en Render (via el hotspot con internet),
-// ya no depende de la IP local del laptop. Al ser HTTPS se usa WiFiClientSecure
-// con setInsecure() (demo: no valida el certificado TLS de Render).
-const char*  SVC_USER       = "poste_iot";
-const char*  SVC_PASS       = "poste123";
-long         SVC_CUENTA_ID  = 7;                             // <-- id de poste_iot en Neon (el login lo corrige igual)
+// Credenciales y backend: vienen de secrets.h (ignorado por Git).
+const char*  WIFI_SSID      = RY_WIFI_SSID;
+const char*  WIFI_PASS      = RY_WIFI_PASS;
+String       BASE_URL       = RY_BASE_URL;   // https://... (nube) o http://IP:8081 (PC local)
+const char*  SVC_USER       = RY_SVC_USER;
+const char*  SVC_PASS       = RY_SVC_PASS;
+long         SVC_CUENTA_ID  = 7;             // informativo: el login lo actualiza con el id real
 const double POSTE_LAT      = -12.08640;
 const double POSTE_LNG      = -77.05000;
 const char*  POSTE_DIR      = "Esquina Av. Salaverry, Jesus Maria (demo)";
@@ -235,12 +242,31 @@ void modoIdle() {
 // ===============================================================
 //  CLIENTE REST ReportaYA
 // ===============================================================
+// Un cliente por esquema: https usa TLS verificado con root_ca.h; http (backend
+// en la PC local) usa un socket plano. Antes siempre se usaba WiFiClientSecure
+// con setInsecure(), asi que el poste no podia hablar con un backend http local
+// y en https aceptaba cualquier certificado.
+WiFiClient       clientePlano;
+WiFiClientSecure clienteTls;
+bool             tlsConfigurado = false;
+
+WiFiClient& ry_cliente() {
+  if (!BASE_URL.startsWith("https://")) return clientePlano;
+  if (!tlsConfigurado) {
+#ifdef RY_TLS_INSECURE
+    clienteTls.setInsecure();               // solo pruebas: no valida el certificado
+#else
+    clienteTls.setCACert(ROOT_CA);
+#endif
+    tlsConfigurado = true;
+  }
+  return clienteTls;
+}
+
 bool ry_login() {
-  WiFiClientSecure client;
-  client.setInsecure();                 // demo: no valida el cert TLS de Render
   HTTPClient http;
   http.setConnectTimeout(10000); http.setTimeout(20000);  // TLS + posible cold start de Render
-  if (!http.begin(client, BASE_URL + "/api/auth/login")) return false;
+  if (!http.begin(ry_cliente(), BASE_URL + "/api/auth/login")) return false;
   http.addHeader("Content-Type", "application/json");
 
   JsonDocument body;
@@ -283,18 +309,16 @@ void auth_tick() {
 long ry_crearReporte(const char* tipo, const String& titulo, const String& desc) {
   if (!ry_ensureAuth()) return -1;
 
-  WiFiClientSecure client;
-  client.setInsecure();
   HTTPClient http;
   http.setConnectTimeout(10000); http.setTimeout(20000);
-  if (!http.begin(client, BASE_URL + "/api/reportes")) return -1;
+  if (!http.begin(ry_cliente(), BASE_URL + "/api/reportes")) return -1;
   http.addHeader("Content-Type", "application/json");
   http.addHeader("Authorization", "Bearer " + jwtToken);
 
   JsonDocument body;
   body["titulo"]       = titulo;
   body["descripcion"]  = desc;
-  body["cuentaId"]     = SVC_CUENTA_ID;      // el backend lo toma del BODY, no del token
+  body["cuentaId"]     = SVC_CUENTA_ID;      // compatibilidad: el backend usa la cuenta del token
   body["tipoProblema"] = tipo;
   JsonObject u = body["ubicacion"].to<JsonObject>();
   u["latitud"]   = POSTE_LAT;
@@ -323,11 +347,9 @@ long ry_crearReporte(const char* tipo, const String& titulo, const String& desc)
 Estado ry_consultarEstado(long id) {
   if (id < 0 || !ry_ensureAuth()) return E_DESCONOCIDO;
 
-  WiFiClientSecure client;
-  client.setInsecure();
   HTTPClient http;
   http.setConnectTimeout(10000); http.setTimeout(20000);
-  if (!http.begin(client, BASE_URL + "/api/reportes/" + String(id))) return E_DESCONOCIDO;
+  if (!http.begin(ry_cliente(), BASE_URL + "/api/reportes/" + String(id))) return E_DESCONOCIDO;
   http.addHeader("Authorization", "Bearer " + jwtToken);
 
   int code = http.GET();
