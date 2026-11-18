@@ -8,6 +8,7 @@ import com.ulima.incidenciaurbana.model.*;
 import com.ulima.incidenciaurbana.repository.ReporteRepository;
 import com.ulima.incidenciaurbana.repository.ReporteSpecification;
 import com.ulima.incidenciaurbana.service.IReporteQueryService;
+import com.ulima.incidenciaurbana.util.UrlPublica;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -129,7 +130,7 @@ public class ReporteQueryServiceImpl implements IReporteQueryService {
         FotoDTO fotoDTO = new FotoDTO();
         fotoDTO.setId(foto.getId());
         fotoDTO.setReporteId(foto.getReporte().getId());
-        fotoDTO.setUrl(foto.getUrl());
+        fotoDTO.setUrl(UrlPublica.absoluta(foto.getUrl()));
         fotoDTO.setTipo(foto.getTipo());
         fotoDTO.setDescripcion(foto.getDescripcion());
         fotoDTO.setFechaCarga(foto.getFechaCarga());

@@ -117,6 +117,15 @@ CREATE TABLE IF NOT EXISTS token_notificaciones (
   CONSTRAINT fk_token_cuenta FOREIGN KEY (cuenta_id) REFERENCES cuentas (id) ON DELETE CASCADE
 );
 
+-- Contenido de fotos cuando no hay Firebase Storage (servido en /media/fotos/{clave})
+CREATE TABLE IF NOT EXISTS foto_archivos (
+  id BIGSERIAL PRIMARY KEY,
+  clave VARCHAR(64) NOT NULL UNIQUE,
+  content_type VARCHAR(50) NOT NULL,
+  contenido BYTEA NOT NULL,
+  fecha_carga TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
 -- Indices
 CREATE INDEX IF NOT EXISTS idx_reportes_cuenta_id ON reportes (cuenta_id);
 CREATE INDEX IF NOT EXISTS idx_reportes_ubicacion_id ON reportes (ubicacion_id);
@@ -134,6 +143,7 @@ CREATE INDEX IF NOT EXISTS idx_cuentas_token_recuperacion ON cuentas (token_recu
 -- SCRIPTS DE LIMPIEZA (usar con precaucion)
 -- ============================================
 /*
+DROP TABLE IF EXISTS foto_archivos CASCADE;
 DROP TABLE IF EXISTS token_notificaciones CASCADE;
 DROP TABLE IF EXISTS historial_estados CASCADE;
 DROP TABLE IF EXISTS fotos CASCADE;
@@ -149,6 +159,7 @@ DROP TABLE IF EXISTS personas CASCADE;
 -- ============================================
 -- FLUJO DE ESTADOS:
 -- PENDIENTE -> REVISION (operador acepta)
--- PENDIENTE -> RECHAZADO (operador rechaza)
+-- PENDIENTE -> RECHAZADO (operador rechaza, con motivo)
+-- REVISION  -> RECHAZADO (operador rechaza, con motivo)
 -- REVISION  -> FINALIZADO (tecnico completa trabajo)
 -- ============================================

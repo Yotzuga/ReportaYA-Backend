@@ -39,15 +39,16 @@ INSERT INTO personas (id, nombres, apellidos, dni, telefono, correo) VALUES
 SELECT setval('personas_id_seq', 6);
 
 -- ==========================================
--- CUENTAS (contrasena en texto plano: el backend la migra a BCrypt en el primer login)
+-- CUENTAS
 -- ==========================================
+-- Todas las cuentas de prueba usan la contrasena 123456 (guardada como hash BCrypt).
 INSERT INTO cuentas (id, usuario, contrasena_hash, persona_id, fecha_creacion, fecha_actualizacion, activo) VALUES
-(1, 'ciudadano',  '123456', 1, NOW(), NOW(), true),
-(2, 'jose',       '123456', 2, NOW(), NOW(), true),
-(3, 'op.maria',   '123456', 3, NOW(), NOW(), true),
-(4, 'tec.carlos', '123456', 4, NOW(), NOW(), true),
-(5, 'tec.lucia',  '123456', 5, NOW(), NOW(), true),
-(6, 'tec.maria',  '123456', 6, NOW(), NOW(), true);
+(1, 'ciudadano',  '$2a$10$UDnS6DRTrpe91jV/kNdHiekzWXaKuEl/g8AANv0y6a04bTnUPBrOy', 1, NOW(), NOW(), true),
+(2, 'jose',       '$2a$10$sy7zkk7bYA/tCeb1YzJPv.8oaaq6loigVhib7idxP4nMV.PjNVKsm', 2, NOW(), NOW(), true),
+(3, 'op.maria',   '$2a$10$esT/xIcfE6skCa2cc.zXYuTw1tr66xmbTvEijHbLRAc7lo38asoES', 3, NOW(), NOW(), true),
+(4, 'tec.carlos', '$2a$10$cNYaN/YaafRn6r32vApG/.tVrfQvAPLo6NB8gbzDHCda.x325VWAW', 4, NOW(), NOW(), true),
+(5, 'tec.lucia',  '$2a$10$5PVtX8mj.O3hSF7zl/NeQONs/aC1uN3U4VR10z4mBrue9X7x.KPeu', 5, NOW(), NOW(), true),
+(6, 'tec.maria',  '$2a$10$BoWZBAA70lJrYdC8ekajYeW/uzFPnDXxsCx6GbZswk1EXkIAre2si', 6, NOW(), NOW(), true);
 
 SELECT setval('cuentas_id_seq', 6);
 

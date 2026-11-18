@@ -1,5 +1,6 @@
 package com.ulima.incidenciaurbana.controller;
 
+import com.ulima.incidenciaurbana.util.ApiErrores;
 import com.ulima.incidenciaurbana.dto.AsignacionDTO;
 import com.ulima.incidenciaurbana.service.IAsignacionService;
 import com.ulima.incidenciaurbana.util.RequestAuth;
@@ -34,7 +35,7 @@ public class AsignacionController {
             AsignacionDTO asignacionCreada = asignacionService.crearAsignacion(asignacionDTO);
             return ResponseEntity.status(HttpStatus.CREATED).body(asignacionCreada);
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", ApiErrores.mensaje(e)));
         }
     }
 }

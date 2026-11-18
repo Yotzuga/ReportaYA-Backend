@@ -34,4 +34,44 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(Map.of("error", ex.getMessage()));
     }
+
+    // [local-dev] Sin esto Spring responde {"error":"Unauthorized"/"Forbidden"} y la app
+    // muestra ese texto en ingles en lugar del mensaje real del login.
+    @ExceptionHandler(com.ulima.incidenciaurbana.exception.InvalidCredentialsException.class)
+    public ResponseEntity<?> handleInvalidCredentials(RuntimeException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", ex.getMessage()));
+    }
+
+    @ExceptionHandler(com.ulima.incidenciaurbana.exception.EmailNotVerifiedException.class)
+    public ResponseEntity<?> handleEmailNotVerified(RuntimeException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", ex.getMessage()));
+    }
+
+    /** Parametro con tipo incorrecto, p. ej. ?estado=FOO o un id no numerico. */
+    @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<?> handleTypeMismatch(
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException ex) {
+        return ResponseEntity.badRequest()
+                .body(Map.of("error", "Valor invalido para '" + ex.getName() + "': " + ex.getValue()));
+    }
+
+    /** Cuerpo JSON mal formado o ausente. */
+    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
+    public ResponseEntity<?> handleUnreadable(Exception ex) {
+        return ResponseEntity.badRequest().body(Map.of("error", "El cuerpo de la solicitud no es un JSON valido"));
+    }
+
+    /** Parametro obligatorio ausente, p. ej. ?motivo= en rechazar. */
+    @ExceptionHandler(org.springframework.web.bind.MissingServletRequestParameterException.class)
+    public ResponseEntity<?> handleMissingParam(
+            org.springframework.web.bind.MissingServletRequestParameterException ex) {
+        return ResponseEntity.badRequest().body(Map.of("error", "Falta el parametro '" + ex.getParameterName() + "'"));
+    }
+
+    /** Violacion de restricciones de BD que se escape a las validaciones previas. */
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ResponseEntity<?> handleDataIntegrity(Exception ex) {
+        return ResponseEntity.badRequest()
+                .body(Map.of("error", "Los datos no son validos o ya existen. Revisa la informacion enviada."));
+    }
 }

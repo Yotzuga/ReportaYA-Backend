@@ -83,28 +83,33 @@ generan conflictos de compilación.
    ```
    psql -d <tu_bd> -f db/seed-cuenta-iot.sql
    ```
-   Anota el `svc_cuenta_id` que imprime (es el `SVC_CUENTA_ID` del firmware). Usuario `poste_iot`,
-   contraseña `poste123` (se migra a BCrypt sola en el primer login).
+   Anota el `svc_cuenta_id` que imprime (informativo: el firmware lo toma del login). Usuario `poste_iot`,
+   contraseña `poste123` (el seed ya la guarda como hash BCrypt).
 3. Levanta el backend en el puerto 8081 (`./mvnw spring-boot:run`).
 
 ### 2) Red (crítico)
 - El ESP32 y el laptop del backend deben estar en el **mismo WiFi/hotspot**.
 - Averigua la **IP LAN del laptop** (`ipconfig` en Windows / `ifconfig` en macOS/Linux), p. ej.
-  `192.168.1.100`. Esa es la que va en `BASE_URL` — **nunca** `localhost` ni `127.0.0.1`.
+  `192.168.1.100`. Esa es la que va en `RY_BASE_URL` — **nunca** `localhost` ni `127.0.0.1`.
 - Permite el **puerto 8081 en el firewall** del laptop (conexiones entrantes).
 - Verifícalo desde el celular en el mismo WiFi abriendo `http://<IP_LAN>:8081/api/reportes/mapa`
   (pide token, pero si responde algo distinto de "timeout" ya hay alcance de red).
 
 ### 3) Firmware
-Edita el bloque **CONFIG** en `reportaya_poste.ino`:
+1. Copia `reportaya_poste/secrets.example.h` como `reportaya_poste/secrets.h` (está en `.gitignore`;
+   nunca subas credenciales al repo) y completa:
 ```cpp
-const char*  WIFI_SSID     = "jefferson";
-const char*  WIFI_PASS     = "gabyjeff1617!!!";
-String       BASE_URL      = "http://192.168.1.100:8081";  // IP LAN del laptop
-long         SVC_CUENTA_ID = 7;                            // id del seed SQL
-const double POSTE_LAT     = -12.08640;
-const double POSTE_LNG     = -77.05000;
+#define RY_WIFI_SSID "TU_RED_WIFI"
+#define RY_WIFI_PASS "TU_PASSWORD_WIFI"
+#define RY_BASE_URL  "http://192.168.1.100:8081"   // PC local; o "https://reportaya-backend.onrender.com"
+#define RY_SVC_USER  "poste_iot"
+#define RY_SVC_PASS  "poste123"
 ```
+2. Ajusta `POSTE_LAT`, `POSTE_LNG` y `POSTE_DIR` en `reportaya_poste.ino`.
+3. Con `https://` el sketch **verifica el certificado** de Render con `root_ca.h`
+   (Google Trust Services / GlobalSign). Con `http://` usa un socket normal.
+   Solo para pruebas con otra CA puedes definir `RY_TLS_INSECURE` en `secrets.h`.
+
 Compila y flashea. En el Monitor Serie (115200) verás `login OK` y la IP asignada.
 
 ---
@@ -152,7 +157,7 @@ en verde, barrera abierta, LCD "Vigilando…". Para reacciones rápidas, `POLL_M
 | Síntoma | Causa probable | Solución |
 |---|---|---|
 | El ESP32 no alcanza el backend | Hotspot con *aislamiento de clientes* | Prueba `ping <IP_LAN>` desde otro equipo; usa un router/AP casero o el hotspot del laptop |
-| `connection refused` / timeout | `localhost` en `BASE_URL`, o firewall | Usa la IP LAN real; abre el puerto 8081 entrante |
+| `connection refused` / timeout | `localhost` en `RY_BASE_URL`, o firewall | Usa la IP LAN real; abre el puerto 8081 entrante |
 | `login FALLO (HTTP 403)` | Cuenta inactiva | El seed la crea con `activo=true`; re-ejecútalo |
 | `HTTP 401` a mitad de demo | Token expiró (24 h) | El firmware re-loguea solo; si persiste, revisa credenciales |
 | Se crean muchos reportes | Sensor oscilando | Ya hay histéresis + confirmación 5 s + un reporte activo a la vez |

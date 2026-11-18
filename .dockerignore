@@ -1,0 +1,12 @@
+target
+.git
+.idea
+.vscode
+*.iml
+api-tests
+assets
+db
+docs
+iot
+src/main/resources/application-local.properties
+**/.DS_Store

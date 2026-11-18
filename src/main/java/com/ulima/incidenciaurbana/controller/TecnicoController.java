@@ -1,5 +1,6 @@
 package com.ulima.incidenciaurbana.controller;
 
+import com.ulima.incidenciaurbana.util.ApiErrores;
 import com.ulima.incidenciaurbana.dto.CompletarReporteRequest;
 import com.ulima.incidenciaurbana.dto.ReporteDTO;
 import com.ulima.incidenciaurbana.dto.TecnicoDTO;
@@ -30,29 +31,39 @@ public class TecnicoController {
 
     @GetMapping
     public ResponseEntity<Page<TecnicoDTO>> obtenerTodosTecnicos(
-            @RequestParam(name = "page", defaultValue = "0") int page) {
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            HttpServletRequest request) {
+        // Lista para asignar: solo operadores.
+        RequestAuth.requireRole(request, RequestAuth.OPERADOR);
         Page<TecnicoDTO> tecnicos = tecnicoService.obtenerTodosTecnicos(page);
         return ResponseEntity.ok(tecnicos);
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<?> obtenerTecnico(@PathVariable Long id) {
+    public ResponseEntity<?> obtenerTecnico(@PathVariable Long id, HttpServletRequest request) {
+        RequestAuth.requireSelfOrRole(request, id, RequestAuth.OPERADOR);
         try {
             TecnicoDTO tecnico = tecnicoService.obtenerTecnicoPorId(id);
             return ResponseEntity.ok(tecnico);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("error", e.getMessage()));
+                    .body(Map.of("error", ApiErrores.mensaje(e)));
         }
     }
 
     @GetMapping("/{id}/reportes")
-    public ResponseEntity<Page<ReporteDTO>> obtenerReportesAsignados(
+    public ResponseEntity<?> obtenerReportesAsignados(
             @PathVariable Long id,
             @RequestParam(name = "estado", required = false) String estado,
-            @RequestParam(name = "page", defaultValue = "0") int page) {
-        Page<ReporteDTO> reportes = tecnicoService.obtenerReportesAsignados(id, estado, page);
-        return ResponseEntity.ok(reportes);
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            HttpServletRequest request) {
+        // Un tecnico solo ve sus asignaciones; el operador ve las de cualquiera.
+        RequestAuth.requireSelfOrRole(request, id, RequestAuth.OPERADOR);
+        try {
+            return ResponseEntity.ok(tecnicoService.obtenerReportesAsignados(id, estado, page));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", ApiErrores.mensaje(e)));
+        }
     }
 
     @PatchMapping("/{id}/reportes/{reporteId}/completar")
@@ -76,10 +87,10 @@ public class TecnicoController {
                     "fotosAdjuntadas", request.getFotos().size(),
                     "estadoFinal", "FINALIZADO"));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", ApiErrores.mensaje(e)));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", e.getMessage()));
+                    .body(Map.of("error", ApiErrores.mensaje(e)));
         }
     }
 }

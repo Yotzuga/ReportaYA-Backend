@@ -14,6 +14,10 @@ public interface CuentaRepository extends JpaRepository<Cuenta, Long> {
 
     Optional<Cuenta> findByUsuario(String usuario);
 
+    boolean existsByUsuarioIgnoreCase(String usuario);
+
+    boolean existsByPersonaDni(String dni);
+
     Optional<Cuenta> findByTokenVerificacion(String token);
 
     Optional<Cuenta> findByTokenRecuperacion(String token);

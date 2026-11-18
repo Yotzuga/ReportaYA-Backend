@@ -31,6 +31,7 @@ public class AuthServiceImpl implements AuthService {
     private final BCryptPasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
     private final IEmailService emailService;
+    private final String hashFicticio;
 
     public AuthServiceImpl(CuentaRepository cuentaRepository,
                            BCryptPasswordEncoder passwordEncoder,
@@ -40,36 +41,31 @@ public class AuthServiceImpl implements AuthService {
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
         this.emailService = emailService;
+        this.hashFicticio = passwordEncoder.encode("usuario-inexistente");
     }
 
     @Override
     @Transactional
     public LoginResponse login(LoginRequest request) {
-        Cuenta c = cuentaRepository.findByUsuario(request.getUsuario())
-                .orElseThrow(InvalidCredentialsException::new);
-
-        String stored = c.getContrasenaHash();
-        boolean valid;
-        boolean needsMigration = false;
-
-        if (stored != null && isBcryptHash(stored)) {
-            valid = passwordEncoder.matches(request.getPassword(), stored);
-        } else {
-            valid = stored != null && stored.equals(request.getPassword());
-            if (valid) needsMigration = true;
+        Cuenta c = cuentaRepository.findByUsuario(request.getUsuario()).orElse(null);
+        if (c == null) {
+            // Mismo costo que una contrasena incorrecta: no revela si el usuario existe.
+            passwordEncoder.matches(request.getPassword(), hashFicticio);
+            throw new InvalidCredentialsException();
         }
 
-        if (!valid) throw new InvalidCredentialsException();
+        // Solo se aceptan hashes BCrypt. Las contrasenas en texto plano heredadas
+        // (datos semilla antiguos) las convierte PasswordMigration al arrancar.
+        String stored = c.getContrasenaHash();
+        if (stored == null || !isBcryptHash(stored)
+                || !passwordEncoder.matches(request.getPassword(), stored)) {
+            throw new InvalidCredentialsException();
+        }
 
         // Credenciales correctas pero la cuenta aún no verificó su correo.
         // Se comprueba DESPUÉS del password para no revelar cuentas por el usuario.
         if (!c.isActivo()) {
             throw new EmailNotVerifiedException();
-        }
-
-        if (needsMigration) {
-            c.setContrasenaHash(passwordEncoder.encode(request.getPassword()));
-            cuentaRepository.save(c);
         }
 
         String nombre = (c.getPersona() != null) ? c.getPersona().getNombreCompleto() : "";
@@ -84,8 +80,10 @@ public class AuthServiceImpl implements AuthService {
             throw new RuntimeException("El correo es obligatorio");
         }
 
-        Cuenta cuenta = cuentaRepository.findByCorreoAndActivoTrue(correo.trim())
-                .orElseThrow(() -> new RuntimeException("El correo no esta asociado a ninguna cuenta"));
+        // Respuesta uniforme: si el correo no existe no se informa (anti-enumeracion),
+        // igual que dice el mensaje del controlador.
+        Cuenta cuenta = cuentaRepository.findByCorreoAndActivoTrue(correo.trim()).orElse(null);
+        if (cuenta == null) return;
 
         String token = generarCodigoRecuperacion();
         cuenta.asignarTokenRecuperacion(token, LocalDateTime.now().plusMinutes(MINUTOS_VALIDEZ_RECUPERACION));
@@ -108,12 +106,12 @@ public class AuthServiceImpl implements AuthService {
         }
 
         Cuenta cuenta = cuentaRepository.findByTokenRecuperacion(token.trim())
-                .orElseThrow(() -> new RuntimeException("Enlace de recuperacion invalido o ya utilizado"));
+                .orElseThrow(() -> new RuntimeException("Codigo de recuperacion invalido o ya utilizado"));
 
         if (cuenta.tokenRecuperacionExpirado()) {
             cuenta.limpiarTokenRecuperacion();
             cuentaRepository.save(cuenta);
-            throw new RuntimeException("El enlace de recuperacion ha expirado. Solicita uno nuevo.");
+            throw new RuntimeException("El codigo de recuperacion ha expirado. Solicita uno nuevo.");
         }
 
         cuenta.cambiarContrasena(passwordEncoder.encode(nuevaContrasena));
@@ -130,7 +128,7 @@ public class AuthServiceImpl implements AuthService {
         return sb.toString();
     }
 
-    private boolean isBcryptHash(String value) {
+    static boolean isBcryptHash(String value) {
         return value.startsWith("$2a$") || value.startsWith("$2b$") || value.startsWith("$2y$");
     }
 }

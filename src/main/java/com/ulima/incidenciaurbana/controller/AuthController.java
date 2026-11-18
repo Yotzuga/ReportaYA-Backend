@@ -1,5 +1,6 @@
 package com.ulima.incidenciaurbana.controller;
 
+import com.ulima.incidenciaurbana.util.ApiErrores;
 import com.ulima.incidenciaurbana.dto.LoginRequest;
 import com.ulima.incidenciaurbana.dto.LoginResponse;
 import com.ulima.incidenciaurbana.service.AuthService;
@@ -28,9 +29,9 @@ public class AuthController {
     public ResponseEntity<?> recuperarPassword(@RequestBody Map<String, String> body) {
         try {
             authService.solicitarRecuperacion(body.get("correo"));
-            return ResponseEntity.ok(Map.of("message", "Si el correo existe, se envio un enlace de recuperacion"));
+            return ResponseEntity.ok(Map.of("message", "Si el correo esta registrado, te enviamos un codigo de recuperacion"));
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", ApiErrores.mensaje(e)));
         }
     }
 
@@ -44,7 +45,7 @@ public class AuthController {
             authService.restablecerContrasena(body.get("token"), nuevaContrasena);
             return ResponseEntity.ok(Map.of("message", "Contrasena restablecida exitosamente"));
         } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("error", ApiErrores.mensaje(e)));
         }
     }
 }
