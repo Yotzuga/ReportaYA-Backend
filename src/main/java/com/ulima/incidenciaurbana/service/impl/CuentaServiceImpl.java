@@ -6,6 +6,7 @@ import com.ulima.incidenciaurbana.repository.CuentaRepository;
 import com.ulima.incidenciaurbana.service.ICuentaService;
 import com.ulima.incidenciaurbana.service.IEmailService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,13 +25,22 @@ public class CuentaServiceImpl implements ICuentaService {
     private final BCryptPasswordEncoder passwordEncoder;
     private final IEmailService emailService;
 
+    /**
+     * Si es false, la cuenta nace activa y no se envia correo. Sirve cuando no hay
+     * un dominio verificado en Resend (sin dominio, Resend solo entrega al dueno
+     * de la cuenta de Resend y nadie mas podria activar su cuenta).
+     */
+    private final boolean verificarCorreo;
+
     @Autowired
     public CuentaServiceImpl(CuentaRepository cuentaRepository,
                              BCryptPasswordEncoder passwordEncoder,
-                             IEmailService emailService) {
+                             IEmailService emailService,
+                             @Value("${app.registro.verificar-correo:true}") boolean verificarCorreo) {
         this.cuentaRepository = cuentaRepository;
         this.passwordEncoder = passwordEncoder;
         this.emailService = emailService;
+        this.verificarCorreo = verificarCorreo;
     }
 
     @Override
@@ -62,18 +72,24 @@ public class CuentaServiceImpl implements ICuentaService {
         String hashedPassword = passwordEncoder.encode(dto.getContrasena());
         Cuenta cuenta = new Ciudadano(dto.getUsuario(), hashedPassword, persona);
 
-        // La cuenta nace INACTIVA hasta que el usuario verifique su correo.
-        cuenta.setActivo(false);
-        String token = UUID.randomUUID().toString();
-        cuenta.asignarTokenVerificacion(token, LocalDateTime.now().plusHours(HORAS_VALIDEZ_TOKEN));
+        Cuenta guardada;
+        if (verificarCorreo) {
+            // La cuenta nace INACTIVA hasta que el usuario verifique su correo.
+            cuenta.setActivo(false);
+            String token = UUID.randomUUID().toString();
+            cuenta.asignarTokenVerificacion(token, LocalDateTime.now().plusHours(HORAS_VALIDEZ_TOKEN));
 
-        Cuenta guardada = cuentaRepository.save(cuenta);
+            guardada = cuentaRepository.save(cuenta);
 
-        // Envía el correo de verificación (no rompe el registro si el envío falla).
-        emailService.enviarVerificacion(
-                guardada.getPersona().getCorreo(),
-                guardada.getPersona().getNombres(),
-                token);
+            // Envía el correo de verificación (no rompe el registro si el envío falla).
+            emailService.enviarVerificacion(
+                    guardada.getPersona().getCorreo(),
+                    guardada.getPersona().getNombres(),
+                    token);
+        } else {
+            cuenta.setActivo(true);
+            guardada = cuentaRepository.save(cuenta);
+        }
 
         CuentaDTO response = new CuentaDTO();
         response.setId(guardada.getId());
