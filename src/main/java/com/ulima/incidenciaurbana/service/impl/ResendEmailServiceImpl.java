@@ -11,9 +11,7 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.util.HtmlUtils;
-import org.springframework.web.util.UriUtils;
 
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -33,18 +31,15 @@ public class ResendEmailServiceImpl implements IEmailService {
     private final String apiKey;
     private final String from;
     private final String baseUrl;
-    private final String passwordResetUrl;
     private final RestClient restClient;
 
     public ResendEmailServiceImpl(
             @Value("${resend.api-key:}") String apiKey,
             @Value("${resend.from:onboarding@resend.dev}") String from,
-            @Value("${app.base-url:http://localhost:8081}") String baseUrl,
-            @Value("${app.password-reset-url:}") String passwordResetUrl) {
+            @Value("${app.base-url:http://localhost:8081}") String baseUrl) {
         this.apiKey = apiKey;
         this.from = from;
         this.baseUrl = baseUrl;
-        this.passwordResetUrl = passwordResetUrl;
 
         // Timeouts para no retener el hilo/recursos si Resend tarda o no responde.
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
@@ -71,8 +66,8 @@ public class ResendEmailServiceImpl implements IEmailService {
     public void enviarRecuperacionContrasena(String correo, String nombre, String token) {
         // Opcion B: "token" es un codigo corto que el usuario ingresa en la app.
         // No se envia enlace (no hay deep link configurado); el codigo va en el correo.
-        // Fallback de demo: dejamos el codigo en el log por si el correo no llega.
-        log.info("[DEV] Codigo de recuperacion para {}: {}", correo, token);
+        // Si no hay RESEND_API_KEY (modo local), enviarCorreo deja el codigo en el log.
+        // Con API key no se registra: quien lea los logs no debe poder cambiar contrasenas.
         enviarCorreo(
                 correo,
                 "Tu codigo para restablecer la contrasena de ReportaYA",
@@ -109,29 +104,6 @@ public class ResendEmailServiceImpl implements IEmailService {
             log.error("[Resend] Error enviando correo de {} a {}: {}. Enlace: {}",
                     tipo, correo, e.getMessage(), enlace);
         }
-    }
-
-    private String construirEnlaceRecuperacion(String urlBase, String token, String correo) {
-        String tokenSeguro = UriUtils.encodeQueryParam(token, StandardCharsets.UTF_8);
-        String correoSeguro = UriUtils.encodeQueryParam(correo, StandardCharsets.UTF_8);
-        boolean incluyeToken = urlBase.contains("{token}") || urlBase.contains("token=");
-        boolean incluyeCorreo = urlBase.contains("{correo}") || urlBase.contains("correo=");
-        if (urlBase.contains("{token}")) {
-            urlBase = urlBase.replace("{token}", tokenSeguro);
-        }
-        if (urlBase.contains("{correo}")) {
-            urlBase = urlBase.replace("{correo}", correoSeguro);
-        }
-        String separador = urlBase.contains("?") ? "&" : "?";
-        String enlace = urlBase;
-        if (!incluyeToken) {
-            enlace += separador + "token=" + tokenSeguro;
-            separador = "&";
-        }
-        if (!incluyeCorreo) {
-            enlace += separador + "correo=" + correoSeguro;
-        }
-        return enlace;
     }
 
     private String construirHtmlVerificacion(String nombre, String enlace) {

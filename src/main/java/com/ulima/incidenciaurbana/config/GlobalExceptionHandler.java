@@ -46,4 +46,25 @@ public class GlobalExceptionHandler {
     public ResponseEntity<?> handleEmailNotVerified(RuntimeException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", ex.getMessage()));
     }
+
+    /** Parametro con tipo incorrecto, p. ej. ?estado=FOO o un id no numerico. */
+    @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<?> handleTypeMismatch(
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException ex) {
+        return ResponseEntity.badRequest()
+                .body(Map.of("error", "Valor invalido para '" + ex.getName() + "': " + ex.getValue()));
+    }
+
+    /** Cuerpo JSON mal formado o ausente. */
+    @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
+    public ResponseEntity<?> handleUnreadable(Exception ex) {
+        return ResponseEntity.badRequest().body(Map.of("error", "El cuerpo de la solicitud no es un JSON valido"));
+    }
+
+    /** Parametro obligatorio ausente, p. ej. ?motivo= en rechazar. */
+    @ExceptionHandler(org.springframework.web.bind.MissingServletRequestParameterException.class)
+    public ResponseEntity<?> handleMissingParam(
+            org.springframework.web.bind.MissingServletRequestParameterException ex) {
+        return ResponseEntity.badRequest().body(Map.of("error", "Falta el parametro '" + ex.getParameterName() + "'"));
+    }
 }

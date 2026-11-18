@@ -49,7 +49,7 @@ public class TecnicoServiceImpl implements ITecnicoService {
 
     @Override
     public Page<TecnicoDTO> obtenerTodosTecnicos(int page) {
-        Pageable pageable = PageRequest.of(page, PAGE_SIZE, Sort.by("id").ascending());
+        Pageable pageable = PageRequest.of(Math.max(0, page), PAGE_SIZE, Sort.by("id").ascending());
         return tecnicoRepository.findAll(pageable).map(tecnico -> new TecnicoDTO(
                 tecnico.getId(),
                 tecnico.getUsuario(),
@@ -78,27 +78,26 @@ public class TecnicoServiceImpl implements ITecnicoService {
 
     @Override
     public Page<ReporteDTO> obtenerReportesAsignados(Long tecnicoId, String estado, int page) {
-        Pageable pageable = PageRequest.of(page, PAGE_SIZE, Sort.by("id").descending());
-
+        Pageable pageable = PageRequest.of(Math.max(0, page), PAGE_SIZE, Sort.by("id").descending());
+        Page<Reporte> reportes;
         if (estado == null || estado.trim().isEmpty()) {
-            return new PageImpl<>(Collections.emptyList(), pageable, 0L);
+            // Sin filtro: todas sus asignaciones (antes devolvia una lista vacia).
+            reportes = reporteRepository.findByTecnicoId(tecnicoId, pageable);
+        } else {
+            EstadoReporte estadoEnum;
+            try {
+                estadoEnum = EstadoReporte.valueOf(estado.trim().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("Estado invalido: " + estado);
+            }
+            reportes = reporteRepository.findByTecnicoIdAndEstado(tecnicoId, estadoEnum, pageable);
         }
-
-        try {
-            EstadoReporte estadoEnum = EstadoReporte.valueOf(estado.toUpperCase());
-            Page<Reporte> reportes = reporteRepository.findByTecnicoIdAndEstado(tecnicoId, estadoEnum, pageable);
-
-            List<ReporteDTO> reportesDTO = reportes.getContent().stream()
-                    .map(r -> queryService.obtenerReportePorId(r.getId()))
-                    .collect(Collectors.toList());
-
-            return new PageImpl<>(reportesDTO, pageable, reportes.getTotalElements());
-        } catch (IllegalArgumentException e) {
-            return new PageImpl<>(Collections.emptyList(), pageable, 0L);
-        }
+        List<ReporteDTO> reportesDTO = reportes.getContent().stream()
+                .map(r -> queryService.obtenerReportePorId(r.getId()))
+                .collect(Collectors.toList());
+        return new PageImpl<>(reportesDTO, pageable, reportes.getTotalElements());
     }
 
-    @Override
     @Transactional
     public ReporteDTO completarReporte(Long tecnicoId, Long reporteId, CompletarReporteRequest request) {
         Objects.requireNonNull(reporteId, "reporteId no puede ser null");

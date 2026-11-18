@@ -5,14 +5,13 @@
 -- Crea una cuenta CIUDADANO *activa* que el ESP32 usa para autenticarse
 -- (POST /api/auth/login) y crear reportes automaticos (POST /api/reportes).
 --
--- Por que CIUDADANO: el backend no aplica autorizacion por rol, asi que una
--- cuenta CIUDADANO basta para crear y consultar reportes. El registro publico
+-- Por que CIUDADANO: crear reportes (POST /api/reportes) esta permitido solo a
+-- CIUDADANO, y el dueño de un reporte puede consultar su detalle. El registro publico
 -- (POST /api/cuenta) dejaria la cuenta INACTIVA hasta verificar el correo, por
 -- eso la insertamos directo con activo=true (mismo criterio que operadores/tecnicos).
 --
--- Contrasena: se guarda en texto plano igual que el resto del seed
--- (ver llenar-TABLAS.sql). El backend detecta que no es un hash BCrypt, valida
--- por comparacion directa en el primer login y la migra a BCrypt sola.
+-- Contrasena: poste123, guardada como hash BCrypt (el backend ya no acepta
+-- contrasenas en texto plano; si encuentra alguna al arrancar, la convierte).
 --
 -- Idempotente: si la cuenta 'poste_iot' ya existe, no hace nada.
 -- Ejecutar en pgAdmin (Query Tool) sobre la BD del proyecto, DESPUES de
@@ -34,9 +33,9 @@ BEGIN
   VALUES ('Poste', 'Civico IoT', '00000001', '900000001', 'poste.iot@reportaya.demo')
   RETURNING id INTO v_persona_id;
 
-  -- 2) Cuenta activa (texto plano -> el backend la migra a BCrypt en el primer login)
+  -- 2) Cuenta activa. Contrasena: poste123 (guardada como hash BCrypt).
   INSERT INTO cuentas (usuario, contrasena_hash, persona_id, fecha_creacion, fecha_actualizacion, activo)
-  VALUES ('poste_iot', 'poste123', v_persona_id, NOW(), NOW(), true)
+  VALUES ('poste_iot', '$2a$10$456qiCCG68hlCWEqvCp8sOqHYVMgdMAMaIgnjCknXZpxDXWcxlRry', v_persona_id, NOW(), NOW(), true)
   RETURNING id INTO v_cuenta_id;
 
   -- 3) Marca de subclase (herencia JOINED)

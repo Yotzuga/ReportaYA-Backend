@@ -35,7 +35,10 @@ FIREBASE_STORAGE_BUCKET=tu-proyecto.firebasestorage.app
 RESEND_API_KEY=re_tu_api_key
 RESEND_FROM=ReportaYA <noreply@mail.grupo5app.lat>
 APP_BASE_URL=http://localhost:8081
-APP_PASSWORD_RESET_URL=reportaya://reset-password
+# Opcionales
+FIREBASE_CREDENTIALS_BASE64=   # JSON de la service account en base64 (fotos en Firebase + push)
+APP_CORS_ALLOWED_ORIGINS=http://localhost:*,http://127.0.0.1:*   # solo para la version web
+JPA_DDL_AUTO=update            # validate en produccion si el esquema ya existe
 ```
 
 > **Verificacion de correo (Resend):** al registrar un ciudadano se envia un
@@ -44,16 +47,17 @@ APP_PASSWORD_RESET_URL=reportaya://reset-password
 > enlace se imprime en consola (modo dev) y no se envia correo.
 >
 > **Recuperacion de contrasena (Resend):** `POST /api/auth/recuperar-password`
-> genera un token temporal y envia un enlace al correo. `APP_PASSWORD_RESET_URL`
-> debe apuntar a la pantalla del front/mobile que recibe `token` y `correo`
-> por query params.
+> genera un **codigo de 6 caracteres** valido 30 minutos y lo envia al correo.
+> El usuario lo escribe en la app y `POST /api/auth/restablecer-password`
+> (`{"token":"<codigo>","nuevaContrasena":"..."}`) cambia la contrasena.
+> Sin `RESEND_API_KEY` el codigo se imprime en la consola del backend.
 >
 > **Produccion:** usa un remitente del dominio verificado en Resend, por ejemplo
 > `ReportaYA <noreply@mail.grupo5app.lat>`, y configura `APP_BASE_URL` con el
 > dominio publico real. Evita enviar enlaces a `localhost`, previews temporales,
 > IPs directas o dominios que no coincidan con el proyecto.
 
-3. (Opcional) Colocar `firebase-service-account.json` en `src/main/resources/` para habilitar Firebase Storage y notificaciones push. Sin este archivo, las fotos se guardan localmente y las notificaciones se simulan en consola.
+3. (Opcional) Firebase: define `FIREBASE_CREDENTIALS_BASE64` (o coloca `firebase-service-account.json` en `src/main/resources/`, ignorado por Git). Sin credenciales, las fotos se guardan en PostgreSQL (tabla `foto_archivos`) y se sirven en `GET /media/fotos/{clave}`; las notificaciones push solo se registran en el log. Asi las fotos sobreviven reinicios y despliegues (el disco de Render es efimero).
 
 4. Ejecutar los scripts SQL en orden:
    - `db/crear-TABLAS.sql` — crea las tablas
@@ -86,6 +90,27 @@ Autenticacion via JWT con `HandlerInterceptor`:
 
 - **Rutas publicas** (sin token): `/api/auth/**`, `/api/cuenta`, `/api/cuenta/verificar`, `/api/cuenta/reenviar-verificacion`
 - **Rutas protegidas** (requieren `Authorization: Bearer <token>`): todo lo demas bajo `/api/**`
+- **Fotos** (`/media/fotos/{clave}`): publicas pero con clave UUID no adivinable.
+
+### Permisos por rol (el actor siempre sale del token, nunca del body)
+
+| Accion | Quien |
+|---|---|
+| Crear reporte | CIUDADANO (queda a nombre de la cuenta del token) |
+| Listar todos / cola del operador | OPERADOR_MUNICIPAL |
+| Reportes de una cuenta, perfil de ciudadano | El propio usuario u OPERADOR |
+| Detalle completo de un reporte | Dueño, tecnico asignado u OPERADOR |
+| Mapa, fotos e historial | Cualquier usuario autenticado |
+| Aceptar, rechazar, asignar, editar, eliminar | OPERADOR |
+| Ver asignaciones / completar | El propio TECNICO (u OPERADOR para ver) |
+
+### Ciclo de estados
+
+`PENDIENTE -> REVISION -> FINALIZADO`, y `PENDIENTE/REVISION -> RECHAZADO` (con motivo).
+FINALIZADO y RECHAZADO son terminales; cualquier otra transicion devuelve 400.
+
+Las contrasenas se guardan solo con BCrypt. Si la base trae alguna en texto plano
+(scripts antiguos), el backend la convierte al arrancar (`PasswordMigration`).
 
 El token se obtiene con `POST /api/auth/login` y tiene validez de 24 horas.
 
@@ -96,7 +121,7 @@ El token se obtiene con `POST /api/auth/login` y tiene validez de 24 horas.
 | Metodo | Ruta | Descripcion | CU |
 |---|---|---|---|
 | POST | `/api/auth/login` | Iniciar sesion (retorna 403 si la cuenta aun no verifico su correo) | CU-01 |
-| POST | `/api/auth/recuperar-password` | Solicitar enlace de recuperacion por correo (`{"correo":"..."}`) | CU-03 |
+| POST | `/api/auth/recuperar-password` | Solicitar codigo de recuperacion por correo (`{"correo":"..."}`) | CU-03 |
 | POST | `/api/auth/restablecer-password` | Restablecer contrasena usando token (`{"token":"...","nuevaContrasena":"..."}`) | CU-03 |
 
 ### Registro (`/api/cuenta`) — Publico
@@ -216,11 +241,11 @@ Payload para cambiar la contrasena:
 }
 ```
 
-- **Token:** UUID con validez de 30 minutos, guardado en `cuentas.token_recuperacion`; se limpia al restablecer la contrasena.
-- **Enlace:** se construye con `APP_PASSWORD_RESET_URL` y el backend agrega `token` y `correo` como query params.
-- **Modo dev:** si `RESEND_API_KEY` esta vacio, el enlace se imprime en consola.
+- **Codigo:** 6 caracteres alfanumericos (sin 0/O, 1/I/L) con validez de 30 minutos, guardado en `cuentas.token_recuperacion`; se limpia al restablecer la contrasena.
+- **Sin enlace:** el usuario escribe el codigo en la app (no hay deep link).
+- **Modo dev:** si `RESEND_API_KEY` esta vacio, el codigo se imprime en consola. Con API key nunca se escribe en el log.
 - **Validacion backend:** la nueva contrasena debe tener al menos 6 caracteres.
-- **Entregabilidad:** el correo se envia con version `html` y `text`. Para mobile, usa un deep link estable o un dominio publico propio, no URLs temporales.
+- **Entregabilidad:** el correo se envia con version `html` y `text`.
 
 Probar el flujo de login y recuperacion con `api-tests/01-auth.rest`.
 

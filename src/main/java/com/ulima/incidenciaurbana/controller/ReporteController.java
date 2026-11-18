@@ -2,6 +2,7 @@ package com.ulima.incidenciaurbana.controller;
 
 import com.ulima.incidenciaurbana.dto.FotoDTO;
 import com.ulima.incidenciaurbana.dto.ReporteDTO;
+import com.ulima.incidenciaurbana.exception.ForbiddenException;
 import com.ulima.incidenciaurbana.model.EstadoReporte;
 import com.ulima.incidenciaurbana.model.TipoFoto;
 import com.ulima.incidenciaurbana.model.TipoProblema;
@@ -17,8 +18,19 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
+/**
+ * Reportes ciudadanos.
+ *
+ * Reglas de acceso (el actor siempre sale del JWT, nunca del body):
+ * - Crear: solo CIUDADANO, y el reporte queda a nombre de la cuenta del token.
+ * - Listar todos: solo OPERADOR. Por cuenta: el propio ciudadano u OPERADOR.
+ * - Detalle completo: el dueño, el tecnico asignado o un OPERADOR.
+ * - Mapa, fotos e historial: cualquier usuario autenticado (no exponen datos personales).
+ * - Editar, cambiar estado, rechazar y eliminar: solo OPERADOR.
+ */
 @RestController
 @RequestMapping("/api/reportes")
 public class ReporteController {
@@ -36,7 +48,10 @@ public class ReporteController {
     }
 
     @PostMapping
-    public ResponseEntity<?> crearReporte(@RequestBody ReporteDTO reporteDTO) {
+    public ResponseEntity<?> crearReporte(@RequestBody ReporteDTO reporteDTO, HttpServletRequest request) {
+        RequestAuth.requireRole(request, RequestAuth.CIUDADANO);
+        // El dueño es la cuenta del token; se ignora cualquier cuentaId enviado por el cliente.
+        reporteDTO.setCuentaId(RequestAuth.cuentaId(request));
         try {
             return new ResponseEntity<>(reporteService.crearReporte(reporteDTO), HttpStatus.CREATED);
         } catch (RuntimeException e) {
@@ -47,7 +62,9 @@ public class ReporteController {
     @GetMapping
     public ResponseEntity<?> obtenerTodosReportes(
             @RequestParam(name = "page", defaultValue = "0") int page,
-            @RequestParam(name = "estado", required = false) EstadoReporte estado) {
+            @RequestParam(name = "estado", required = false) EstadoReporte estado,
+            HttpServletRequest request) {
+        RequestAuth.requireRole(request, RequestAuth.OPERADOR);
         return ResponseEntity.ok(queryService.obtenerTodosReportes(page, estado));
     }
 
@@ -61,17 +78,22 @@ public class ReporteController {
     @GetMapping("/cuenta/{cuentaId}")
     public ResponseEntity<?> obtenerReportesPorCuenta(
             @PathVariable Long cuentaId,
-            @RequestParam(name = "page", defaultValue = "0") int page) {
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            HttpServletRequest request) {
+        RequestAuth.requireSelfOrRole(request, cuentaId, RequestAuth.OPERADOR);
         return ResponseEntity.ok(queryService.obtenerReportesPorCuenta(cuentaId, page));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<?> obtenerReportePorId(@PathVariable Long id) {
+    public ResponseEntity<?> obtenerReportePorId(@PathVariable Long id, HttpServletRequest request) {
+        ReporteDTO reporte;
         try {
-            return ResponseEntity.ok(queryService.obtenerReportePorId(id));
+            reporte = queryService.obtenerReportePorId(id);
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
         }
+        verificarLecturaDetalle(reporte, request);
+        return ResponseEntity.ok(reporte);
     }
 
     @PutMapping("/{id}")
@@ -103,29 +125,50 @@ public class ReporteController {
             @PathVariable Long id, @RequestParam String motivo,
             HttpServletRequest request) {
         RequestAuth.requireRole(request, RequestAuth.OPERADOR);
+        if (motivo == null || motivo.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "El motivo de rechazo es obligatorio"));
+        }
         try {
-            return ResponseEntity.ok(reporteService.rechazarReporte(id, motivo));
+            return ResponseEntity.ok(reporteService.rechazarReporte(id, motivo.trim()));
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 
     @PostMapping("/{id}/fotos")
-    public ResponseEntity<?> subirFoto(@PathVariable Long id, @RequestBody Map<String, String> body) {
+    public ResponseEntity<?> subirFoto(@PathVariable Long id, @RequestBody Map<String, String> body,
+            HttpServletRequest request) {
+        String archivoBase64 = body.get("archivoBase64");
+        String tipoStr = body.getOrDefault("tipo", "INICIAL");
+        String descripcion = body.getOrDefault("descripcion", "");
+
+        if (archivoBase64 == null || archivoBase64.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "archivoBase64 es obligatorio"));
+        }
+        TipoFoto tipo;
         try {
-            String archivoBase64 = body.get("archivoBase64");
-            String tipoStr = body.getOrDefault("tipo", "INICIAL");
-            String descripcion = body.getOrDefault("descripcion", "");
-
-            if (archivoBase64 == null || archivoBase64.isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of("error", "archivoBase64 es obligatorio"));
-            }
-
-            TipoFoto tipo = TipoFoto.valueOf(tipoStr.toUpperCase());
-            FotoDTO foto = fotoService.subirFoto(id, archivoBase64, tipo, descripcion);
-            return new ResponseEntity<>(foto, HttpStatus.CREATED);
+            tipo = TipoFoto.valueOf(tipoStr.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", "Tipo de foto invalido. Use INICIAL o FINAL"));
+        }
+
+        ReporteDTO reporte;
+        try {
+            reporte = queryService.obtenerReportePorId(id);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+        }
+        // INICIAL: el ciudadano dueño del reporte (o un operador). FINAL: solo via
+        // PATCH /api/tecnicos/{id}/reportes/{rid}/completar (o un operador).
+        boolean esOperador = RequestAuth.hasRole(request, RequestAuth.OPERADOR);
+        boolean esDueno = RequestAuth.isSelf(request, reporte.getCuentaId());
+        if (!esOperador && !(esDueno && tipo == TipoFoto.INICIAL)) {
+            throw new ForbiddenException("No puedes adjuntar fotos a este reporte.");
+        }
+
+        try {
+            FotoDTO foto = fotoService.subirFoto(id, archivoBase64, tipo, descripcion);
+            return new ResponseEntity<>(foto, HttpStatus.CREATED);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
@@ -160,5 +203,16 @@ public class ReporteController {
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
         }
+    }
+
+    /** Dueño, tecnico asignado u operador. */
+    private void verificarLecturaDetalle(ReporteDTO reporte, HttpServletRequest request) {
+        if (RequestAuth.hasRole(request, RequestAuth.OPERADOR)) return;
+        Long actor = RequestAuth.cuentaId(request);
+        if (actor == null) throw new ForbiddenException("No tienes permiso para ver este reporte.");
+        if (Objects.equals(actor, reporte.getCuentaId())) return;
+        if (RequestAuth.hasRole(request, RequestAuth.TECNICO)
+                && Objects.equals(actor, reporte.getTecnicoAsignadoId())) return;
+        throw new ForbiddenException("No tienes permiso para ver este reporte.");
     }
 }

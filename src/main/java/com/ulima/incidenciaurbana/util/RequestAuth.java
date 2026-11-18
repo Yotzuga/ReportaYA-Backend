@@ -37,4 +37,28 @@ public final class RequestAuth {
         }
         throw new ForbiddenException("No tienes permiso para realizar esta accion.");
     }
+
+    /** true si el usuario autenticado tiene ese rol. */
+    public static boolean hasRole(HttpServletRequest req, String role) {
+        return role.equals(tipoCuenta(req));
+    }
+
+    /** true si el id indicado es el de la cuenta autenticada. */
+    public static boolean isSelf(HttpServletRequest req, Long id) {
+        Long actual = cuentaId(req);
+        return actual != null && actual.equals(id);
+    }
+
+    /**
+     * Permite la accion si el recurso pertenece a la cuenta autenticada o si
+     * el usuario tiene alguno de los roles indicados; si no, 403. Evita que un
+     * usuario lea o modifique datos de otro solo cambiando el id (IDOR).
+     */
+    public static void requireSelfOrRole(HttpServletRequest req, Long ownerId, String... roles) {
+        if (isSelf(req, ownerId)) return;
+        for (String r : roles) {
+            if (hasRole(req, r)) return;
+        }
+        throw new ForbiddenException("No tienes permiso para acceder a este recurso.");
+    }
 }

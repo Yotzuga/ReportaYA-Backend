@@ -1,18 +1,27 @@
 package com.ulima.incidenciaurbana.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
-import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Component
 public class WebConfig implements WebMvcConfigurer {
 
     private final JwtInterceptor jwtInterceptor;
+    private final String[] corsOrigins;
 
-    public WebConfig(JwtInterceptor jwtInterceptor) {
+    /**
+     * @param corsOrigins patrones permitidos separados por coma (app.cors.allowed-origins).
+     *        La app movil no usa CORS; esto solo aplica a la version web. Por defecto
+     *        solo localhost; en produccion se configura con el dominio real.
+     */
+    public WebConfig(JwtInterceptor jwtInterceptor,
+            @Value("${app.cors.allowed-origins:http://localhost:*,http://127.0.0.1:*}") String corsOrigins) {
         this.jwtInterceptor = jwtInterceptor;
+        this.corsOrigins = java.util.Arrays.stream(corsOrigins.split(","))
+                .map(String::trim).filter(o -> !o.isEmpty()).toArray(String[]::new);
     }
 
     @Override
@@ -30,17 +39,8 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
-                .allowedOrigins("*")
+                .allowedOriginPatterns(corsOrigins)
                 .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
                 .allowedHeaders("*");
-    }
-
-    // [local-dev] Sirve las fotos guardadas en disco cuando Firebase Storage no esta
-    // configurado (FotoServiceImpl las escribe en ./uploads). Fuera de /api, sin JWT,
-    // para que Image.network de la app pueda mostrarlas.
-    @Override
-    public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        String uploads = java.nio.file.Paths.get("uploads").toAbsolutePath().toUri().toString();
-        registry.addResourceHandler("/uploads/**").addResourceLocations(uploads);
     }
 }

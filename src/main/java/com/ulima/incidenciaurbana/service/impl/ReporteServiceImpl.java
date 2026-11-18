@@ -114,6 +114,7 @@ public class ReporteServiceImpl implements IReporteService {
         EstadoReporte estadoAnterior = reporte.getEstado();
         if (estadoAnterior == nuevoEstado)
             return queryService.convertirADTO(reporte);
+        validarTransicion(estadoAnterior, nuevoEstado);
 
         reporte.cambiarEstado(nuevoEstado);
         reporte = reporteRepository.save(reporte);
@@ -137,6 +138,8 @@ public class ReporteServiceImpl implements IReporteService {
 
         if (estadoAnterior == EstadoReporte.RECHAZADO)
             return queryService.convertirADTO(reporte);
+        if (estadoAnterior == EstadoReporte.FINALIZADO)
+            throw new RuntimeException("No se puede rechazar un reporte que ya fue FINALIZADO");
         reporte.cambiarEstado(EstadoReporte.RECHAZADO);
         reporte.setComentarioResolucion(motivo);
         reporte.setFechaCierre(java.time.LocalDateTime.now());
@@ -181,5 +184,23 @@ public class ReporteServiceImpl implements IReporteService {
         if (!reporteRepository.existsById(id))
             throw new RuntimeException("Reporte no encontrado con id: " + id);
         reporteRepository.deleteById(id);
+    }
+
+    /**
+     * Ciclo de vida permitido:
+     *   PENDIENTE -> REVISION (operador acepta)
+     *   REVISION  -> FINALIZADO (tecnico completa)
+     *   PENDIENTE/REVISION -> RECHAZADO solo via rechazarReporte (exige motivo).
+     * FINALIZADO y RECHAZADO son estados terminales.
+     */
+    private void validarTransicion(EstadoReporte actual, EstadoReporte nuevo) {
+        if (nuevo == EstadoReporte.RECHAZADO) {
+            throw new RuntimeException("Para rechazar un reporte usa la accion Rechazar (requiere motivo)");
+        }
+        boolean ok = (actual == EstadoReporte.PENDIENTE && nuevo == EstadoReporte.REVISION)
+                || (actual == EstadoReporte.REVISION && nuevo == EstadoReporte.FINALIZADO);
+        if (!ok) {
+            throw new RuntimeException("Transicion no permitida: " + actual + " -> " + nuevo);
+        }
     }
 }

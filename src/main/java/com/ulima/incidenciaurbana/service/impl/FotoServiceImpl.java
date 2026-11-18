@@ -2,20 +2,19 @@ package com.ulima.incidenciaurbana.service.impl;
 
 import com.ulima.incidenciaurbana.dto.FotoDTO;
 import com.ulima.incidenciaurbana.model.Foto;
+import com.ulima.incidenciaurbana.model.FotoArchivo;
 import com.ulima.incidenciaurbana.model.Reporte;
 import com.ulima.incidenciaurbana.model.TipoFoto;
+import com.ulima.incidenciaurbana.repository.FotoArchivoRepository;
 import com.ulima.incidenciaurbana.repository.FotoRepository;
 import com.ulima.incidenciaurbana.repository.ReporteRepository;
 import com.ulima.incidenciaurbana.service.IFirebaseStorageService;
 import com.ulima.incidenciaurbana.service.IFotoService;
+import com.ulima.incidenciaurbana.util.UrlPublica;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Base64;
 import java.util.UUID;
 
@@ -26,18 +25,20 @@ public class FotoServiceImpl implements IFotoService {
     private final FotoRepository fotoRepository;
     private final ReporteRepository reporteRepository;
     private final IFirebaseStorageService firebaseStorageService;
+    private final FotoArchivoRepository archivoRepository;
 
-    // [local-dev] URL publica del backend para armar enlaces absolutos a fotos locales.
-    @org.springframework.beans.factory.annotation.Value("${app.base-url:http://localhost:8081}")
-    private String baseUrl;
+    /** Tope por foto (ya comprimida por la app: 1280 px, calidad 60). */
+    private static final int MAX_BYTES = 5 * 1024 * 1024;
 
     @Autowired
     public FotoServiceImpl(FotoRepository fotoRepository,
             ReporteRepository reporteRepository,
-            IFirebaseStorageService firebaseStorageService) {
+            IFirebaseStorageService firebaseStorageService,
+            FotoArchivoRepository archivoRepository) {
         this.fotoRepository = fotoRepository;
         this.reporteRepository = reporteRepository;
         this.firebaseStorageService = firebaseStorageService;
+        this.archivoRepository = archivoRepository;
     }
 
     @Override
@@ -50,25 +51,28 @@ public class FotoServiceImpl implements IFotoService {
         String base64Limpio = archivoBase64.contains(",")
                 ? archivoBase64.substring(archivoBase64.indexOf(',') + 1)
                 : archivoBase64;
-        byte[] decodedBytes = Base64.getDecoder().decode(base64Limpio);
+        byte[] decodedBytes;
+        try {
+            decodedBytes = Base64.getDecoder().decode(base64Limpio.replaceAll("\\s", ""));
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException("La foto no es un base64 valido");
+        }
+        if (decodedBytes.length == 0) throw new RuntimeException("La foto esta vacia");
+        if (decodedBytes.length > MAX_BYTES) throw new RuntimeException("La foto supera el maximo de 5 MB");
+
         String extension = determinarExtension(decodedBytes);
-        String nombreArchivo = "fotos/reporte-" + reporteId + "-" + tipo + "-"
-                + UUID.randomUUID() + "." + extension;
+        String clave = UUID.randomUUID().toString();
+        String nombreArchivo = "fotos/reporte-" + reporteId + "-" + tipo + "-" + clave + "." + extension;
 
         String urlFoto;
         if (firebaseStorageService.isAvailable()) {
             urlFoto = firebaseStorageService.uploadFile(nombreArchivo, decodedBytes);
         } else {
-            try {
-                Path dirPath = Paths.get("uploads/fotos");
-                Files.createDirectories(dirPath);
-                Path filePath = dirPath.resolve(nombreArchivo);
-                Files.createDirectories(filePath.getParent());
-                Files.write(filePath, decodedBytes);
-                urlFoto = baseUrl + "/uploads/fotos/" + nombreArchivo; // [local-dev] antes era ruta relativa
-            } catch (IOException e) {
-                throw new RuntimeException("Error al guardar foto localmente: " + e.getMessage(), e);
-            }
+            // Sin Firebase: la foto se guarda en PostgreSQL y se sirve en /media/fotos/{clave}.
+            // Antes se escribia en ./uploads con una ruta relativa: en Render ese disco se
+            // borra en cada despliegue y la app no podia abrir la ruta.
+            archivoRepository.save(new FotoArchivo(clave, contentType(extension), decodedBytes));
+            urlFoto = "/media/fotos/" + clave;
         }
 
         Foto foto = new Foto(reporte, urlFoto, tipo, descripcion);
@@ -81,7 +85,7 @@ public class FotoServiceImpl implements IFotoService {
         FotoDTO dto = new FotoDTO();
         dto.setId(foto.getId());
         dto.setReporteId(foto.getReporte().getId());
-        dto.setUrl(foto.getUrl());
+        dto.setUrl(UrlPublica.absoluta(foto.getUrl()));
         dto.setTipo(foto.getTipo());
         dto.setDescripcion(foto.getDescripcion());
         dto.setFechaCarga(foto.getFechaCarga());
@@ -96,5 +100,13 @@ public class FotoServiceImpl implements IFotoService {
                 && bytes.length > 12 && bytes[8] == 0x57 && bytes[9] == 0x45 && bytes[10] == 0x42 && bytes[11] == 0x50)
             return "webp";
         return "jpg";
+    }
+
+    private String contentType(String extension) {
+        switch (extension) {
+            case "png": return "image/png";
+            case "webp": return "image/webp";
+            default: return "image/jpeg";
+        }
     }
 }

@@ -19,6 +19,9 @@ public interface ReporteRepository extends JpaRepository<Reporte, Long>, JpaSpec
     Page<Reporte> findByEstado(EstadoReporte estado, Pageable pageable);
 
     @EntityGraph(attributePaths = { "ubicacion", "cuenta", "cuenta.persona" })
+    Page<Reporte> findByTecnicoId(Long tecnicoId, Pageable pageable);
+
+    @EntityGraph(attributePaths = { "ubicacion", "cuenta", "cuenta.persona" })
     Page<Reporte> findByTecnicoIdAndEstado(Long tecnicoId, EstadoReporte estado, Pageable pageable);
 
     @Override

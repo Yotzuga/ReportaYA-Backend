@@ -26,7 +26,9 @@ public class OperadorController {
     @GetMapping("/reportes")
     public ResponseEntity<Page<ReporteDTO>> obtenerReportes(
             @RequestParam(name = "estado") String estado,
-            @RequestParam(name = "page", defaultValue = "0") int page) {
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            HttpServletRequest request) {
+        RequestAuth.requireRole(request, RequestAuth.OPERADOR);
         try {
             Page<ReporteDTO> reportes = operadorService.obtenerReportesPorEstado(estado, page);
             return ResponseEntity.ok(reportes);

@@ -10,7 +10,7 @@ public class AsignacionDTO {
     @NotNull(message = "El ID del reporte es obligatorio")
     private Long reporteId;
 
-    @NotNull(message = "El ID del operador municipal es obligatorio")
+    // No se valida: el controlador lo toma siempre del JWT del operador.
     private Long operadorId;
 
     @NotNull(message = "El ID del tecnico es obligatorio")

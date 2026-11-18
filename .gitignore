@@ -6,6 +6,9 @@ target/
 
 # Archivos de fotos locales
 uploads/
+
+# macOS
+.DS_Store
 test_results.txt
 
 # Firebase Service Account (credenciales sensibles)
