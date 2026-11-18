@@ -44,6 +44,7 @@ public class ReporteServiceImpl implements IReporteService {
 
     @Override
     public ReporteDTO crearReporte(ReporteDTO reporteDTO) {
+        validarTextos(reporteDTO);
         if (reporteDTO.getUbicacion() == null)
             throw new RuntimeException("La ubicacion es obligatoria para crear un reporte");
         if (reporteDTO.getUbicacion().getLatitud() == null || reporteDTO.getUbicacion().getLongitud() == null)
@@ -79,6 +80,7 @@ public class ReporteServiceImpl implements IReporteService {
     public ReporteDTO actualizarReporte(Long id, ReporteDTO reporteDTO) {
         if (id == null)
             throw new RuntimeException("El ID del reporte es obligatorio");
+        validarTextos(reporteDTO);
         Reporte reporte = reporteRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Reporte no encontrado con id: " + id));
 
@@ -202,5 +204,17 @@ public class ReporteServiceImpl implements IReporteService {
         if (!ok) {
             throw new RuntimeException("Transicion no permitida: " + actual + " -> " + nuevo);
         }
+    }
+
+    /** Evita que un texto vacio o demasiado largo llegue a la BD como error SQL (500). */
+    private void validarTextos(ReporteDTO dto) {
+        String titulo = dto.getTitulo() == null ? "" : dto.getTitulo().trim();
+        String descripcion = dto.getDescripcion() == null ? "" : dto.getDescripcion().trim();
+        if (titulo.isEmpty()) throw new RuntimeException("El titulo es obligatorio");
+        if (descripcion.isEmpty()) throw new RuntimeException("La descripcion es obligatoria");
+        if (titulo.length() > 255) throw new RuntimeException("El titulo no puede superar 255 caracteres");
+        if (descripcion.length() > 1000) throw new RuntimeException("La descripcion no puede superar 1000 caracteres");
+        dto.setTitulo(titulo);
+        dto.setDescripcion(descripcion);
     }
 }
